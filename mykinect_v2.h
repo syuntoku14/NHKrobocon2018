@@ -5,6 +5,7 @@
 #include <iostream>
 #include <sstream>
 #include <map>
+#include<queue>
 
 #define ERROR_CHECK( ret )  \
     if ( (ret) != S_OK ) {    \
@@ -13,26 +14,34 @@
         throw std::runtime_error( ss.str().c_str() );			\
     } \
 
+class vLine {
+public:
+	int length;
+	cv::Vec4i line;
+	std::vector<int> top{ -1,-1 };
+	vLine(int length, cv::Vec4i line) {
+		this->length = length;
+		this->line = line;
+	}
+	vLine() { this->length = -1; };
+};
+
 class MyKinectV2
 {
-private:
-	// Kinect SDK
+protected:
 	CComPtr<IKinectSensor> kinect = nullptr;
-	//colordata用
 	CComPtr<IColorFrameReader> colorFrameReader = nullptr;
 	unsigned int colorBytesPerPixel;
 	ColorImageFormat colorFormat = ColorImageFormat::ColorImageFormat_Bgra;
-	std::vector<BYTE> colorBuffer;
-	int colorWidth;
-	int colorHeight;
-	
-	//depthdata用
 	CComPtr<IDepthFrameReader> depthFrameReader = nullptr;
+
+	std::vector<BYTE> colorBuffer;
+	int colorWidth, colorHeight;
+	cv::Mat RGBImage;
+
 	std::vector<UINT16> depthBuffer;
-	int depthWidth; //512
-	int depthHeight; //424
-	int depthPointX;
-	int depthPointY;
+	int depthWidth, depthHeight; //523 424
+	int depthPointX, depthPointY;
 	const char* DepthWindowName = "Depth Image";
 	cv::Mat depthImage;
 
@@ -41,67 +50,49 @@ public:
 	MyKinectV2();
 
 	//colorに関する関数
-	void initializeColor(); 	
-	void runColor();
-	//depthに関する関数
-	void initializeDepth();
-	void runDepth();
-	void showDistance();
-
-	static void mouseCallback(int event, int x, int y, int flags, void* userdata) {
-		// 引数に渡したthisポインタを経由してメンバ関数に渡す
-		auto pThis = (MyKinectV2*)userdata;
-		pThis->mouseCallback(event, x, y, flags);
-	};
-	void mouseCallback(int event, int x, int y, int flags) {
-		if (event == CV_EVENT_LBUTTONDOWN) {
-			depthPointX = x;
-			depthPointY = y;
-		}
-	};
-
-	//colorデータの処理
-	void updateColor(); 
+	void initializeColor();
 	void updateColorFrame();
-	void drawColor();
-	void drawColorFrame(); 
+	void setRGB();
 
-	//depthデータの処理
-	void updateDepth(); 
+	//depthに関する関数
+	virtual void initializeDepth();
 	void updateDepthFrame();
-	void drawDepth();
-	void drawDepthFrame();
+	void setDepth();
+	void binarization(cv::Mat image, const int minDepth, const int maxDepth);
+
+	void getShuttleLoc();
 
 	//line検出
 	std::vector<cv::Vec4i> lines;
-	void getHoughLines(cv::Mat& src);
+	virtual void getHoughLines(cv::Mat& src);
 
 	//ポール検出
 	char ringtype;
-	int poleX; //0~depthWidthのどれか MINLENGTHより小さい値の時は-1
-	int poleLength;//ポールの長さ pixel
-	std::vector<int> poleTop{-1,-1}; //poleの頂点の座標 ポールがないときは(x,y)に-1,-1が入る
-	float sumTopX;
-	float sumTopY;
-	bool sucFlag=false;
 
+	vLine poleLine;
+
+	//深度の範囲を指定
+	const UINT16 MINDEPTH = 3500, MAXDEPTH = 5000;
+
+	//houghLinesの精度
+	const int RHO = 2, MINLINELENGTH = 180, MAXLINEGAP = 10, THRESHOLD = 50;
+	const double ANGLETHRESHOLD = 0.90;
+
+	//シャトルコックの判定の閾値
+	const int FILTERTH = 300;  //フィルター:これ以下の値は0にする
+	const int SHATTLETH = 2000;  //シャトルコックが存在するか判定する閾値
+	const int KERNELSIZE = 10; //カーネルの長さ
+	const float SUCCESSTH = 0.9;  //リングの半径とシャトルコックの距離の比の閾値
+
+	//poleTopを更新するフレーム
+	const int updateFrame = 8;
+	long long countFrame = 0;
 	//シャトルコックが通ったか判定
 	cv::Rect ringROI;
 	cv::Mat ringImage;
 	cv::Mat tempImage;
-	bool judgeCockThrough(); //ringtype=='g'でゴールデンシャトルコック用
-	cv::Scalar ringSumB4;
-	cv::Scalar ringSum;
-	bool findShuttle();
-	cv::Mat filteredRing; //ringImageと同じサイズ,型
-	cv::Point shuttleXYB4;
-	cv::Point shuttleXY;
-	cv::Point shuttleXY_suc;
-	//void findPoleX();
-	//circle検出
-	//std::vector<cv::Vec3f> circles;
-	//void getHoughCircles(cv::Mat &src);
+	virtual bool judgeCockThrough(); //ringtype=='g'でゴールデンシャトルコック用
+	virtual bool findShuttle();
+	cv::Point shuttleXY, shuttleXY_suc;
 
-	void saveDepthMovie();
-	void useDepthMovie();
 };

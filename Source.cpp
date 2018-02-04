@@ -1,4 +1,5 @@
 #include"mykinect_v2.h"
+#include"NHKdebug.h"
 #include"MySerial.h"
 #include<iostream>
 
@@ -9,9 +10,9 @@ void robocon();
 void saveMovie();
 void useMovie();
 
-MySerial serial(COMPORT);
+//MySerial serial(COMPORT);
 
-void main()
+int main()
 {
 	ringtemp[0] = 'r';
 	//êMçÜÇ™ëóÇÁÇÍÇÈÇ‹Ç≈ë“ã@
@@ -20,7 +21,7 @@ void main()
 	//robocon();
 	//saveMovie();
 	useMovie();
-
+	return 0;
 }
 
 void robocon() {
@@ -30,8 +31,7 @@ void robocon() {
 		app.ringtype = ringtemp[0];
 		app.initializeDepth();
 		while (1) {
-			app.updateDepth();
-			app.drawDepth();
+			app.getShuttleLoc();
 			//serial.sendData(app.poleX);
 			auto key = cv::waitKey(1);
 			if (key == 'q') {
@@ -46,13 +46,12 @@ void robocon() {
 
 void saveMovie() {
 	try {
-		MyKinectV2 app;
+		KinectDebug dbg;
 		//É|Å[ÉãÇÃéÌóﬁÇäiî[
-		app.ringtype = ringtemp[0];
-		app.initializeDepth();
+		dbg.ringtype = ringtemp[0];
+		dbg.initializeDepth();
 		while (1) {
-			app.updateDepth();
-			app.saveDepthMovie();
+			dbg.saveDepthMovie();
 			auto key = cv::waitKey(1);
 			if (key == 'q') {
 				break;
@@ -66,11 +65,10 @@ void saveMovie() {
 
 void useMovie() {
 	try {
-		MyKinectV2 app;
-		app.initializeDepth();
-		//É|Å[ÉãÇÃéÌóﬁÇäiî[
-		app.ringtype = ringtemp[0];
-		app.useDepthMovie();
+		KinectDebug dbg;
+		dbg.initializeDepth();
+		dbg.ringtype = ringtemp[0];
+		dbg.useDepthMovie();
 	}
 	catch (std::exception& ex) {
 		std::cout << ex.what() << std::endl;
