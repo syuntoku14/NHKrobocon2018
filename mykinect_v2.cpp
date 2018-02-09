@@ -26,7 +26,7 @@ void MyKinectV2::initializeColor() {
 	ERROR_CHECK(defaultColorFrameDescription->get_Width(&colorWidth));
 	ERROR_CHECK(defaultColorFrameDescription->get_Height(&colorHeight));
 	ERROR_CHECK(defaultColorFrameDescription->get_BytesPerPixel(&colorBytesPerPixel));
-	std::cout << "default : " << colorWidth << ", " << colorHeight << ", " << colorBytesPerPixel << std::endl;
+	std::cout << "colorWidth : " << colorWidth << std::endl << "colorHeight: " << colorHeight << std::endl << "colorBytesPerPixel: " << colorBytesPerPixel << std::endl;
 
 	// カラー画像のサイズを取得する
 	CComPtr<IFrameDescription> colorFrameDescription;
@@ -97,7 +97,7 @@ void MyKinectV2::setDepth() {
 	updateDepthFrame();
 	depthImage = cv::Mat(depthHeight, depthWidth, CV_8UC1);
 	for (int i = 0; i < depthImage.total(); i++) {
-		depthImage.data[i] = depthBuffer[i];
+		depthImage.data[i] = (UINT16)((depthBuffer[i] / 8000.0) * 255.0);
 	}
 }
 
@@ -113,9 +113,10 @@ void MyKinectV2::getShuttleLoc() {
 	}
 }
 
-void MyKinectV2::binarization(cv::Mat image, const int minDepth, const int maxDepth) {
+void MyKinectV2::binarization(cv::Mat& image, const int minDepth, const int maxDepth) {
+	double mid = 255 * minDepth / 8000.0, mxd = 255 * maxDepth / 8000.0;
 	for (int i = 0; i < image.total(); ++i) {
-		if (minDepth < image.data[i] && image.data[i] < maxDepth) {
+		if (mid < image.data[i] && image.data[i] < mxd) {
 			image.data[i] = 255;  //2値化
 		}
 		else {
@@ -130,27 +131,28 @@ void MyKinectV2::getHoughLines(cv::Mat& src) {
 	using namespace cv;
 
 	static Mat dst;
+	std::vector<cv::Vec4i> lines;
 
 	Canny(src, dst, 50, 200, 3);
 	HoughLinesP(dst, lines, RHO, CV_PI / 360.0, THRESHOLD, MINLINELENGTH, MAXLINEGAP);
 	
-	auto v = [](vLine m1, vLine m2) {return m1.length < m2.length; };
-	priority_queue<vLine,std::vector<vLine>,decltype(v)> vLines(v);
+	auto v = [](Pole m1, Pole m2) {return m1.length < m2.length; };
+	priority_queue<Pole,std::vector<Pole>,decltype(v)> Poles(v);
 	//一定以上の角度のものを抽出
 	for (size_t i = 0; i < lines.size(); i++) {
 		double angle = atan(abs(lines[i][1] - lines[i][3]) / (abs(lines[i][0] - lines[i][2]) + 1e-10));
 		if (lines[i][0] < 507 && lines[i][0]>5) { //端っこでバグる
 			if (angle > CV_PI / 2.0*ANGLETHRESHOLD) {
 				int length = (int)sqrt(pow((lines[i][0] - lines[i][2]), 2) + pow((lines[i][1] - lines[i][3]), 2));
-				vLines.push(vLine(length,lines[i]));
+				Poles.push(Pole(length,lines[i]));
 			}
 		}
 	}
 
 	//poleLineとpoleLine.topへ代入
-	if (!vLines.empty()) {
+	if (!Poles.empty()) {
 		if (countFrame % updateFrame == 0) {
-			poleLine = vLines.top();
+			poleLine = Poles.top();
 			if (poleLine.line[1] >= poleLine.line[3]) {  poleLine.top[0] = poleLine.line[2]; poleLine.top[1] += poleLine.line[3]; }
 			else { poleLine.top[0] = poleLine.line[0]; poleLine.top[1] += poleLine.line[1]; }
 		}
@@ -159,26 +161,24 @@ void MyKinectV2::getHoughLines(cv::Mat& src) {
 }
 
 bool MyKinectV2::judgeCockThrough() {
-	//static auto kernel = makeKernel(10);
 	static cv::Scalar ringSum(-1e8);
 	double ringRad, trueLength;
-	ringtype == 'g' ? (ringRad = 400.0, trueLength = 3000.0) : (ringRad = 400.0, trueLength = 2000.0);
+	poleLine.ringtype == 'g' ? (ringRad = 400.0, trueLength = 3000.0) : (ringRad = 400.0, trueLength = 2000.0);
 	if (poleLine.top[0] != -1) {
 		int sideLength = (int)(poleLine.length * ringRad / trueLength);
 		int x = abs(poleLine.top[0] - sideLength), y = abs(poleLine.top[1] - sideLength * 2);
 		//リングの範囲を切り抜く
-		ringROI = cv::Rect(x, y, sideLength * 2, sideLength * 2);
-		ringImage = depthImage(ringROI);
+		poleLine.ringROI = cv::Rect(x, y, sideLength * 2, sideLength * 2);
+		poleLine.ringImage = depthImage(poleLine.ringROI);
 		//フィルターをかける
-	//	cv::filter2D(ringImage, ringImage, -1, cv::Mat(KERNELLENGTH, KERNELLENGTH, CV_64F, &kernel));
-		cv::threshold(ringImage, ringImage, FILTERTH, 0, cv::THRESH_TOZERO);
+		cv::threshold(poleLine.ringImage, poleLine.ringImage, FILTERTH, 0, cv::THRESH_TOZERO);
 
-		if (SHATTLETH < ringSum[0] - cv::sum(ringImage)[0]) {
+		if (SHATTLETH < ringSum[0] - cv::sum(poleLine.ringImage)[0]) {
 			return true;
 		}
 		else {
-			cv::minMaxLoc(ringImage, NULL, NULL, NULL, &shuttleXY);
-			ringSum = cv::sum(ringImage);
+			cv::minMaxLoc(poleLine.ringImage, NULL, NULL, NULL, &poleLine.shuttleXY);
+			ringSum = cv::sum(poleLine.ringImage);
 			return false;
 		}
 	}
@@ -187,14 +187,14 @@ bool MyKinectV2::judgeCockThrough() {
 
 bool MyKinectV2::findShuttle() {
 	//中心からの差分を取得
-	shuttleXY.x = (-ringImage.rows / 2 + shuttleXY.x); shuttleXY.y = (-ringImage.cols / 2 + shuttleXY.y);
-	float r = pow(ringImage.rows / 2.0, 2.0), d = pow(shuttleXY.x, 2.0) + pow(shuttleXY.y, 2.0);
+	poleLine.shuttleXY.x = (-poleLine.ringImage.rows / 2 + poleLine.shuttleXY.x); poleLine.shuttleXY.y = (-poleLine.ringImage.cols / 2 + poleLine.shuttleXY.y);
+	float r = pow(poleLine.ringImage.rows / 2.0, 2.0), d = pow(poleLine.shuttleXY.x, 2.0) + pow(poleLine.shuttleXY.y, 2.0);
 
-	std::cout << "x= " << shuttleXY.x << std::endl << "y= " << shuttleXY.y << std::endl;
+	std::cout << "x= " << poleLine.shuttleXY.x << std::endl << "y= " << poleLine.shuttleXY.y << std::endl;
 	std::cout << r <<" "<< d << std::endl;
 
 	if (d/r < SUCCESSTH) {
-		shuttleXY_suc = shuttleXY;
+		poleLine.shuttleXY_suc = poleLine.shuttleXY;
 		return true;
 	}
 	else return false;

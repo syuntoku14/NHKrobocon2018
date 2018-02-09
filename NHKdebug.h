@@ -14,9 +14,10 @@ public:
 			depthPointY = y;
 		}
 	};
-	
+	void saveRGBMovie();
 	void saveDepthMovie();
 	void useDepthMovie();
+	void showRGB();
 	void showDistance();
 	void initializeDepth();
 

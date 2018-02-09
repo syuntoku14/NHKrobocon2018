@@ -5,46 +5,66 @@
 #include<string>
 #include<opencv2\highgui.hpp>
 #include<fstream>
+#include<map>
 
 template<typename T>
 class ValueManager {
 public:
+	class V {
+	public:
+		int slider;
+		T* value;
+		T max_value;
+	};
+
 	cv::FileStorage fs;
 	std::string filename;
-	T* value;
-	T originvalue;
-	ValueManager(std::string filename, T* value) {
+	std::map<std::string, V> values;
+	ValueManager(std::string filename) {
 		this->filename = filename;
-		this->value = value;
-		this->originvalue = *value;
-	};
-	ValueManager() { fs.release() };
-
-	void saveValue(std::string valuename) {
-		using namespace cv;
-		fs.open(filename, FileStorage::WRITE);
-		fs << valuename << *value;
 	};
 
-	void getValue(std::string valuename) {
+	~ValueManager() {
+		fs.release();
+	};
+
+	void get_value(std::string value_name, T *value) {
 		using  namespace cv;
 		fs.open(filename, FileStorage::READ);
-		fs[valuename] >> *value;
+		fs[value_name] >> *value;
+		fs.release();
 	};
 
-	int slider = 0, SLIDER_MAX = 100;
+	void set_value(std::string value_name, T* value, T max_value) {
+		V val;
+		val.slider = 0;
+		get_value(value_name,value);
+		std::cout << *value << std::endl;
+		val.value = value;
+		val.max_value = max_value;
+		values[value_name] = val;
+	};
+
+	void save_value() {
+		using namespace cv;
+		fs.open(filename, FileStorage::WRITE);
+		while (!values.empty()) {
+			auto itr = values.begin();
+			fs << itr->first << *itr->second.value;
+			values.erase(values.begin());
+		}
+	};
 
 	static void onTrackbar(int, void *object) {
-		ValueManager *self = (ValueManager*)object;
-		*self->value = self->originvalue*((T)self->slider / self->SLIDER_MAX);
-		std::cout << *self->value << std::endl;
-	}
-
-	void trackbar(std::string valuename) {
+		using namespace std;
+		V *val = (V*)object;
+		*val->value=(T)val->slider;
+	};
+	void trackbar(std::string windowName) {
 		using namespace cv;
-		const std::string windowName = "track";
-		int value = 10;
-		namedWindow(windowName, CV_WINDOW_AUTOSIZE);
-		createTrackbar(valuename, windowName, &slider, SLIDER_MAX, &ValueManager::onTrackbar, this);
+		cv::namedWindow(windowName, CV_WINDOW_AUTOSIZE | CV_WINDOW_FREERATIO);
+		for (auto i = values.begin(); i != values.end(); ++i) {
+			createTrackbar(i->first, windowName, &i->second.slider, (int)i->second.max_value, &ValueManager::onTrackbar, &i->second);
+		}
 	};
 };

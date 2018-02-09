@@ -2,7 +2,8 @@
 
 //動画の保存先と利用先
 std::time_t now = std::time(nullptr);
-std::string writeName = "./shuttleMovies/" + std::to_string(now) + ".avi";
+std::string writeName_depth = "./shuttleMovies/depth"+ std::to_string(now) + ".avi";
+std::string writeName_RGB = "./shuttleMovies/RGB" + std::to_string(now) + ".avi";
 std::string useName = "./shuttleMovies/suc1.avi";
 
 void KinectDebug::initializeDepth() {
@@ -43,10 +44,21 @@ void KinectDebug::initializeDepth() {
 }
 
 void KinectDebug::saveDepthMovie() {
-	static cv::VideoWriter writer(writeName,cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(depthWidth, depthHeight), false);
+	static cv::VideoWriter depthWriter(writeName_depth,cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(depthWidth, depthHeight), false);
 	setDepth();
-	writer << depthImage;
+	depthWriter << depthImage;
 	imshow("depthImage", depthImage);
+}
+
+void KinectDebug::saveRGBMovie() {
+	using namespace cv;
+	Size sz(640, 480);
+	Mat img;
+	static  cv::VideoWriter rgbWriter(writeName_RGB, cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(colorWidth, colorHeight), true);
+	setRGB();
+	cvtColor(RGBImage, img, CV_BGRA2BGR);
+	rgbWriter << img;
+	imshow("RGBImage", RGBImage);
 }
 
 void KinectDebug::useDepthMovie() {
@@ -75,6 +87,11 @@ void KinectDebug::useDepthMovie() {
 	}
 }
 
+void KinectDebug::showRGB() {
+	cv::Mat img;
+	cv::resize(RGBImage, img, cv::Size(), 0.3, 0.3);
+	cv::imshow("RGB", img);
+}
 void KinectDebug::showDistance() {
 	int index = (depthPointY * depthWidth) + depthPointX;
 	std::stringstream ss;
@@ -93,28 +110,29 @@ void KinectDebug::getHoughLines(cv::Mat& src) {
 	using namespace cv;
 
 	static Mat dst, color_dst;
+	std::vector<cv::Vec4i> lines;
 	string str_x;
 	Canny(src, dst, 50, 200, 3);
 	cvtColor(dst, color_dst, CV_GRAY2BGR);
 	HoughLinesP(dst, lines, RHO, CV_PI / 360.0, THRESHOLD, MINLINELENGTH, MAXLINEGAP);
 
-	auto v = [](vLine m1, vLine m2) {return m1.length < m2.length; };
-	priority_queue<vLine, std::vector<vLine>, decltype(v)> vLines(v);
+	auto v = [](Pole m1, Pole m2) {return m1.length < m2.length; };
+	priority_queue<Pole, std::vector<Pole>, decltype(v)> Poles(v);
 	//一定以上の角度のものを抽出
 	for (size_t i = 0; i < lines.size(); i++) {
 		double angle = atan(abs(lines[i][1] - lines[i][3]) / (abs(lines[i][0] - lines[i][2]) + 1e-10));
 		if (lines[i][0] < 507 && lines[i][0]>5) { //端っこがバグの原因になるから
 			if (angle > CV_PI / 2.0*ANGLETHRESHOLD) {
 				int length = (int)sqrt(pow((lines[i][0] - lines[i][2]), 2) + pow((lines[i][1] - lines[i][3]), 2));
-				vLines.push(vLine(length, lines[i]));
+				Poles.push(Pole(length, lines[i]));
 			}
 		}
 	}
 
 	//poleLineとpoleLine.topを更新
-	if (!vLines.empty()) {
+	if (!Poles.empty()) {
 		if (countFrame % updateFrame == 0) {
-			poleLine = vLines.top();
+			poleLine = Poles.top();
 			if (poleLine.line[1] >= poleLine.line[3]) { poleLine.top[0] = poleLine.line[2]; poleLine.top[1] += poleLine.line[3]; }
 			else { poleLine.top[0] = poleLine.line[0]; poleLine.top[1] += poleLine.line[1]; }
 		}
@@ -134,21 +152,21 @@ bool KinectDebug::judgeCockThrough() {
 	static cv::Mat kernel = cv::Mat::ones(KERNELSIZE, KERNELSIZE, CV_64F) / (double)(KERNELSIZE*KERNELSIZE);
 	static cv::Scalar ringSum(-1e8);
 	double ringRad, trueLength;
-	ringtype == 'g' ? (ringRad = 400.0, trueLength = 3000.0) : (ringRad = 400.0, trueLength = 2000.0);
+	poleLine.ringtype == 'g' ? (ringRad = 400.0, trueLength = 3000.0) : (ringRad = 400.0, trueLength = 2000.0);
 	if (poleLine.top[0] != -1) {
 		int sideLength = (int)(poleLine.length * ringRad / trueLength);
 		int x = abs(poleLine.top[0] - sideLength), y = abs(poleLine.top[1] - sideLength * 2);
-		ringROI = cv::Rect(x, y, sideLength * 2, sideLength * 2);
-		ringImage = depthImage(ringROI);
-		cv::filter2D(ringImage, ringImage, -1,kernel);
-		cv::threshold(ringImage, ringImage, FILTERTH, 0, cv::THRESH_TOZERO);
-		cv::imshow("ringImage", ringImage);
-		if (SHATTLETH < ringSum[0] - cv::sum(ringImage)[0]) {
+		poleLine.ringROI = cv::Rect(x, y, sideLength * 2, sideLength * 2);
+		poleLine.ringImage = depthImage(poleLine.ringROI);
+		cv::filter2D(poleLine.ringImage, poleLine.ringImage, -1,kernel);
+		cv::threshold(poleLine.ringImage, poleLine.ringImage, FILTERTH, 0, cv::THRESH_TOZERO);
+		cv::imshow("poleLine.ringImage", poleLine.ringImage);
+		if (SHATTLETH < ringSum[0] - cv::sum(poleLine.ringImage)[0]) {
 			return true;
 		}
 		else {
-			cv::minMaxLoc(ringImage, NULL, NULL, NULL, &shuttleXY);
-			ringSum = cv::sum(ringImage);
+			cv::minMaxLoc(poleLine.ringImage, NULL, NULL, NULL, &poleLine.shuttleXY);
+			ringSum = cv::sum(poleLine.ringImage);
 			return false;
 		}
 	}
@@ -157,19 +175,18 @@ bool KinectDebug::judgeCockThrough() {
 
 bool KinectDebug::findShuttle() {
 	cv::Mat color_ring;
-	cv::cvtColor(tempImage, color_ring, CV_GRAY2BGR);
 	//シャトルコックの中心を描画
-	//circle(color_ring, shuttleXY, 3, cv::Scalar(255, 0, 0), -1, 8, 0);
-	shuttleXY.x = (-ringImage.rows / 2 + shuttleXY.x);
-	shuttleXY.y = (-ringImage.cols / 2 + shuttleXY.y);
-	std::cout << "x= " << shuttleXY.x << std::endl << "y= " << shuttleXY.y << std::endl;
-	float r = pow(ringImage.rows / 2.0, 2.0);
-	float d = pow(shuttleXY.x, 2.0) + pow(shuttleXY.y, 2.0);
+	//circle(color_ring, poleLine.shuttleXY, 3, cv::Scalar(255, 0, 0), -1, 8, 0);
+	poleLine.shuttleXY.x = (-poleLine.ringImage.rows / 2 + poleLine.shuttleXY.x);
+	poleLine.shuttleXY.y = (-poleLine.ringImage.cols / 2 + poleLine.shuttleXY.y);
+	std::cout << "x= " << poleLine.shuttleXY.x << std::endl << "y= " << poleLine.shuttleXY.y << std::endl;
+	float r = pow(poleLine.ringImage.rows / 2.0, 2.0);
+	float d = pow(poleLine.shuttleXY.x, 2.0) + pow(poleLine.shuttleXY.y, 2.0);
 
 	std::cout << r << " " << d << std::endl;
 
 	if (d / r < SUCCESSTH) {
-		shuttleXY_suc = shuttleXY;
+		poleLine.shuttleXY_suc = poleLine.shuttleXY;
 		//imshow("shuttlePoint", color_ring);
 		return true;
 	}
