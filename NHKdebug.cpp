@@ -1,11 +1,5 @@
 #include"NHKdebug.h"
 
-//動画の保存先と利用先
-std::time_t now = std::time(nullptr);
-std::string writeName_depth = "./shuttleMovies/depth"+ std::to_string(now) + ".avi";
-std::string writeName_RGB = "./shuttleMovies/RGB" + std::to_string(now) + ".avi";
-std::string useName = "./shuttleMovies/suc1.avi";
-
 void KinectDebug::initializeDepth() {
 	// Depthリーダーを取得する
 	CComPtr<IDepthFrameSource> depthFrameSource;
@@ -43,46 +37,49 @@ void KinectDebug::initializeDepth() {
 
 }
 
-void KinectDebug::saveDepthMovie() {
-	static cv::VideoWriter depthWriter(writeName_depth,cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(depthWidth, depthHeight), false);
+void KinectDebug::saveDepthMovie(std::string movieName) {
+	static cv::VideoWriter depthWriter(movieName,cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(depthWidth, depthHeight), false);
 	setDepth();
 	depthWriter << depthImage;
 	imshow("depthImage", depthImage);
 }
 
-void KinectDebug::saveRGBMovie() {
+void KinectDebug::saveRGBMovie(std::string movieName) {
 	using namespace cv;
 	Size sz(640, 480);
 	Mat img;
-	static  cv::VideoWriter rgbWriter(writeName_RGB, cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(colorWidth, colorHeight), true);
+	static  cv::VideoWriter rgbWriter(movieName, cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(colorWidth, colorHeight), true);
 	setRGB();
 	cvtColor(RGBImage, img, CV_BGRA2BGR);
 	rgbWriter << img;
-	imshow("RGBImage", RGBImage);
+	showRGB();
 }
 
-void KinectDebug::useDepthMovie() {
-	static cv::VideoCapture cap(useName);
-	cv::Mat temp;
+void KinectDebug::useMovie(std::string movieName_rgb,std::string movieName_depth) {
+	static cv::VideoCapture cap_rgb(movieName_rgb), cap_depth(movieName_depth);
+	cv::Mat temp_rgb, temp_depth;
 
 	while (1) {
-		cap >> temp;
-		if (temp.empty()) break;
+		cap_rgb >> temp_rgb; cap_depth >> temp_depth;
+		if (temp_rgb.empty() || temp_depth.empty()) break;
 		auto key = cv::waitKey(1);
 		if (key == 'q') break;
 		else if (key == 's') cv::waitKey(0);
-		cv::cvtColor(temp, depthImage, CV_RGB2GRAY);
-		//binarization(depthImage, MINDEPTH, MAXDEPTH);
-		cv::medianBlur(depthImage, depthImage, 3);
+		cv::cvtColor(temp_depth, depthImage, CV_RGB2GRAY);
+		binarization(depthImage, MINDEPTH, MAXDEPTH);
+		cv::medianBlur(depthImage, depthImage, 5);
 		showDistance();
 		getHoughLines(depthImage);
+
+		cvtColor(temp_rgb, RGBImage, CV_BGR2BGRA);
+		hsvKeeper.setHSVImage(RGBImage);
+		hsvKeeper.extractColor();
+		binarization(hsvKeeper.hsvImage, MINDEPTH, MAXDEPTH);
+		cv::medianBlur(hsvKeeper.hsvImage, hsvKeeper.hsvImage, 5);
+		hsvKeeper.showHSV();
+		getHoughLines(hsvKeeper.hsvImage);
+
 		if (judgeCockThrough()) {
-			if (findShuttle()) {
-				std::cout << "success!" << std::endl;
-			}
-		}
-		if (countFrame > 530) {
-			std::cout << "Fault" << std::endl;
 		}
 	}
 }
@@ -161,6 +158,8 @@ bool KinectDebug::judgeCockThrough() {
 		cv::filter2D(poleLine.ringImage, poleLine.ringImage, -1,kernel);
 		cv::threshold(poleLine.ringImage, poleLine.ringImage, FILTERTH, 0, cv::THRESH_TOZERO);
 		cv::imshow("poleLine.ringImage", poleLine.ringImage);
+		ringSum = cv::sum(poleLine.ringImage);
+		std::cout << ringSum[0] << std::endl;
 		if (SHATTLETH < ringSum[0] - cv::sum(poleLine.ringImage)[0]) {
 			return true;
 		}
@@ -176,7 +175,7 @@ bool KinectDebug::judgeCockThrough() {
 bool KinectDebug::findShuttle() {
 	cv::Mat color_ring;
 	//シャトルコックの中心を描画
-	//circle(color_ring, poleLine.shuttleXY, 3, cv::Scalar(255, 0, 0), -1, 8, 0);
+	circle(color_ring, poleLine.shuttleXY, 3, cv::Scalar(255, 0, 0), -1, 8, 0);
 	poleLine.shuttleXY.x = (-poleLine.ringImage.rows / 2 + poleLine.shuttleXY.x);
 	poleLine.shuttleXY.y = (-poleLine.ringImage.cols / 2 + poleLine.shuttleXY.y);
 	std::cout << "x= " << poleLine.shuttleXY.x << std::endl << "y= " << poleLine.shuttleXY.y << std::endl;
@@ -187,7 +186,7 @@ bool KinectDebug::findShuttle() {
 
 	if (d / r < SUCCESSTH) {
 		poleLine.shuttleXY_suc = poleLine.shuttleXY;
-		//imshow("shuttlePoint", color_ring);
+	//imshow("shuttlePoint", color_ring);
 		return true;
 	}
 	else return false;

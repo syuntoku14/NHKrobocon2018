@@ -4,6 +4,8 @@ MyKinectV2::MyKinectV2() {
 	// デフォルトのKinectを取得する
 	ERROR_CHECK(::GetDefaultKinectSensor(&kinect));
 	ERROR_CHECK(kinect->Open());
+	// Retrieved Coordinate Mapper
+	ERROR_CHECK(kinect->get_CoordinateMapper(&coordinateMapper));
 }
 
 MyKinectV2::~MyKinectV2()
@@ -58,6 +60,33 @@ void MyKinectV2::setRGB() {
 	RGBImage = cv::Mat(colorHeight, colorWidth, CV_8UC4, &colorBuffer[0]);
 }
 
+void MyKinectV2::setMappedRGB() {
+	updateColorFrame();
+	// Retrieve Mapped Coordinates
+	std::vector<ColorSpacePoint> colorSpacePoints(depthWidth * depthHeight);
+	ERROR_CHECK(coordinateMapper->MapDepthFrameToColorSpace(depthBuffer.size(), &depthBuffer[0], colorSpacePoints.size(), &colorSpacePoints[0]));
+	// Mapped Color Buffer
+	std::vector<BYTE> buffer(depthWidth * depthHeight * colorBytesPerPixel);
+
+	// Mapping Color Data to Depth Resolution
+	for (int depthY = 0; depthY < depthHeight; depthY++) {
+		for (int depthX = 0; depthX < depthWidth; depthX++) {
+			const unsigned int depthIndex = depthY * depthWidth + depthX;
+			const int colorX = static_cast<int>(colorSpacePoints[depthIndex].X + 0.5f);
+			const int colorY = static_cast<int>(colorSpacePoints[depthIndex].Y + 0.5f);
+			if ((0 <= colorX) && (colorX < colorWidth) && (0 <= colorY) && (colorY < colorHeight)) {
+				const unsigned int colorIndex = colorY * colorWidth + colorX;
+				buffer[depthIndex * colorBytesPerPixel + 0] = colorBuffer[colorIndex * colorBytesPerPixel + 0];
+				buffer[depthIndex * colorBytesPerPixel + 1] = colorBuffer[colorIndex * colorBytesPerPixel + 1];
+				buffer[depthIndex * colorBytesPerPixel + 2] = colorBuffer[colorIndex * colorBytesPerPixel + 2];
+				buffer[depthIndex * colorBytesPerPixel + 3] = colorBuffer[colorIndex * colorBytesPerPixel + 3];
+			}
+		}
+	}
+	
+	RGBImage = cv::Mat(depthHeight, depthWidth, CV_8UC4, &buffer[0]).clone();
+}
+
 void MyKinectV2::updateDepthFrame() {
 	// Depthフレームを取得する
 	CComPtr<IDepthFrame> depthFrame;
@@ -93,6 +122,7 @@ void MyKinectV2::initializeDepth() {
 	// バッファーを作成する
 	depthBuffer.resize(depthWidth * depthHeight);
 }
+
 void MyKinectV2::setDepth() {
 	updateDepthFrame();
 	depthImage = cv::Mat(depthHeight, depthWidth, CV_8UC1);
@@ -161,18 +191,16 @@ void MyKinectV2::getHoughLines(cv::Mat& src) {
 }
 
 bool MyKinectV2::judgeCockThrough() {
+	static cv::Mat kernel = cv::Mat::ones(KERNELSIZE, KERNELSIZE, CV_64F) / (double)(KERNELSIZE*KERNELSIZE);
 	static cv::Scalar ringSum(-1e8);
 	double ringRad, trueLength;
 	poleLine.ringtype == 'g' ? (ringRad = 400.0, trueLength = 3000.0) : (ringRad = 400.0, trueLength = 2000.0);
 	if (poleLine.top[0] != -1) {
 		int sideLength = (int)(poleLine.length * ringRad / trueLength);
 		int x = abs(poleLine.top[0] - sideLength), y = abs(poleLine.top[1] - sideLength * 2);
-		//リングの範囲を切り抜く
 		poleLine.ringROI = cv::Rect(x, y, sideLength * 2, sideLength * 2);
 		poleLine.ringImage = depthImage(poleLine.ringROI);
-		//フィルターをかける
 		cv::threshold(poleLine.ringImage, poleLine.ringImage, FILTERTH, 0, cv::THRESH_TOZERO);
-
 		if (SHATTLETH < ringSum[0] - cv::sum(poleLine.ringImage)[0]) {
 			return true;
 		}
@@ -189,7 +217,6 @@ bool MyKinectV2::findShuttle() {
 	//中心からの差分を取得
 	poleLine.shuttleXY.x = (-poleLine.ringImage.rows / 2 + poleLine.shuttleXY.x); poleLine.shuttleXY.y = (-poleLine.ringImage.cols / 2 + poleLine.shuttleXY.y);
 	float r = pow(poleLine.ringImage.rows / 2.0, 2.0), d = pow(poleLine.shuttleXY.x, 2.0) + pow(poleLine.shuttleXY.y, 2.0);
-
 	std::cout << "x= " << poleLine.shuttleXY.x << std::endl << "y= " << poleLine.shuttleXY.y << std::endl;
 	std::cout << r <<" "<< d << std::endl;
 

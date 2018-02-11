@@ -14,9 +14,11 @@ public:
 			depthPointY = y;
 		}
 	};
-	void saveRGBMovie();
-	void saveDepthMovie();
-	void useDepthMovie();
+	void saveRGBMovie(std::string movieName);
+	void saveDepthMovie(std::string movieName);
+
+	void useMovie(std::string movieName_rgb,std::string movieName_depth);
+	
 	void showRGB();
 	void showDistance();
 	void initializeDepth();

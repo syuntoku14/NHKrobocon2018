@@ -25,6 +25,7 @@ protected:
 	unsigned int colorBytesPerPixel;
 	ColorImageFormat colorFormat = ColorImageFormat::ColorImageFormat_Bgra;
 	CComPtr<IDepthFrameReader> depthFrameReader = nullptr;
+	CComPtr<ICoordinateMapper> coordinateMapper;
 
 public:
 	~MyKinectV2();
@@ -68,6 +69,7 @@ public:
 	void initializeColor();
 	void updateColorFrame();
 	void setRGB();
+	void setMappedRGB();
 
 	class HSVkeeper {
 	public:
@@ -75,14 +77,26 @@ public:
 		int max_h, max_s, max_v;
 		cv::Scalar hsv_min;
 		cv::Scalar hsv_max;
+
+		cv::FileStorage fs;
+		HSVkeeper() {
+			fs.open("hsvValues.xml", cv::FileStorage::READ);
+			fs["min_h"] >> min_h; fs["min_s"] >> min_s; fs["min_v"] >> min_v;
+			fs["max_h"] >> max_h; fs["max_s"] >> max_s; fs["max_v"] >> max_v;
+			fs.release();
+		};
+
 		void setHSVvalues() {
 			hsv_min = cv::Scalar(min_h, min_s, min_v);
 			hsv_max = cv::Scalar(max_h, max_s, max_v);
 		};
 		cv::Mat hsvImage;
 		void setHSVImage(cv::Mat &img) { cv::cvtColor(img, hsvImage, CV_RGB2HSV); };
-		void extractColor() { inRange(hsvImage, hsv_min, hsv_max, hsvImage); };
-		void showHSVImage() { 
+		void extractColor() { 
+			inRange(hsvImage, hsv_min, hsv_max, hsvImage);
+			cv::medianBlur(hsvImage, hsvImage, 3);
+		};
+		void showHSV() { 
 			cv::Mat img;
 			cv::resize(hsvImage, img, cv::Size(), 0.3, 0.3);
 			cv::imshow("HSVImage", img);
@@ -96,7 +110,6 @@ public:
 	virtual void initializeDepth();
 	void updateDepthFrame();
 	void setDepth();
-
 	//ê[ìxÇÃîÕàÕ
 	UINT16 MINDEPTH = 3500, MAXDEPTH = 8000;
 	void binarization(cv::Mat &image, const int minDepth, const int maxDepth);
