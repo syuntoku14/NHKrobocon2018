@@ -1,6 +1,7 @@
 #include"NHKdebug.h"
 
 void KinectDebug::initializeDepth() {
+#pragma region error_check	
 	// Depthリーダーを取得する
 	CComPtr<IDepthFrameSource> depthFrameSource;
 	ERROR_CHECK(kinect->get_DepthFrameSource(&depthFrameSource));
@@ -27,6 +28,7 @@ void KinectDebug::initializeDepth() {
 	std::cout << "Depth最大値       : " << maxDepthReliableDistance << std::endl;
 	std::cout << "depthWidth: " << depthWidth << std::endl;
 	std::cout << "depthHeight: " << depthHeight << std::endl;
+#pragma endregion
 
 	// バッファーを作成する
 	depthBuffer.resize(depthWidth * depthHeight);
@@ -35,53 +37,6 @@ void KinectDebug::initializeDepth() {
 	cv::namedWindow(DepthWindowName);
 	cv::setMouseCallback(DepthWindowName, &KinectDebug::mouseCallback, this);
 
-}
-
-void KinectDebug::saveDepthMovie(std::string movieName) {
-	static cv::VideoWriter depthWriter(movieName,cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(depthWidth, depthHeight), false);
-	setDepth();
-	depthWriter << depthImage;
-	imshow("depthImage", depthImage);
-}
-
-void KinectDebug::saveRGBMovie(std::string movieName) {
-	using namespace cv;
-	Size sz(640, 480);
-	Mat img;
-	static  cv::VideoWriter rgbWriter(movieName, cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(colorWidth, colorHeight), true);
-	setRGB();
-	cvtColor(RGBImage, img, CV_BGRA2BGR);
-	rgbWriter << img;
-	showRGB();
-}
-
-void KinectDebug::useMovie(std::string movieName_rgb,std::string movieName_depth) {
-	static cv::VideoCapture cap_rgb(movieName_rgb), cap_depth(movieName_depth);
-	cv::Mat temp_rgb, temp_depth;
-
-	while (1) {
-		cap_rgb >> temp_rgb; cap_depth >> temp_depth;
-		if (temp_rgb.empty() || temp_depth.empty()) break;
-		auto key = cv::waitKey(1);
-		if (key == 'q') break;
-		else if (key == 's') cv::waitKey(0);
-		cv::cvtColor(temp_depth, depthImage, CV_RGB2GRAY);
-		binarization(depthImage, MINDEPTH, MAXDEPTH);
-		cv::medianBlur(depthImage, depthImage, 5);
-		showDistance();
-		getHoughLines(depthImage);
-
-		cvtColor(temp_rgb, RGBImage, CV_BGR2BGRA);
-		hsvKeeper.setHSVImage(RGBImage);
-		hsvKeeper.extractColor();
-		binarization(hsvKeeper.hsvImage, MINDEPTH, MAXDEPTH);
-		cv::medianBlur(hsvKeeper.hsvImage, hsvKeeper.hsvImage, 5);
-		hsvKeeper.showHSV();
-		getHoughLines(hsvKeeper.hsvImage);
-
-		if (judgeCockThrough()) {
-		}
-	}
 }
 
 void KinectDebug::showRGB() {

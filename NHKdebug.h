@@ -3,6 +3,7 @@
 
 class KinectDebug :public MyKinectV2 {
 public:
+#pragma region mouseCallback
 	static void mouseCallback(int event, int x, int y, int flags, void* userdata) {
 		// 引数に渡したthisポインタを経由してメンバ関数に渡す
 		auto pThis = (KinectDebug*)userdata;
@@ -14,11 +15,8 @@ public:
 			depthPointY = y;
 		}
 	};
-	void saveRGBMovie(std::string movieName);
-	void saveDepthMovie(std::string movieName);
+#pragma endregion
 
-	void useMovie(std::string movieName_rgb,std::string movieName_depth);
-	
 	void showRGB();
 	void showDistance();
 	void initializeDepth();

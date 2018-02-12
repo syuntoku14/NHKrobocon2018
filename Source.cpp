@@ -13,7 +13,7 @@ const int COMPORT = 5;
 char ringtemp[1];
 
 void robocon();
-void saveMovie();
+void saveMovie(std::string movieName_rgb, std::string movieName_depth);
 void useMovie(std::string movieName_rgb, std::string movieName_depth);
 void adjustValues(std::string movieName_rgb, std::string movieName_depth);
 void test();
@@ -59,7 +59,7 @@ void adjustValues(std::string movieName_rgb, std::string movieName_depth) {
 		dbg.poleLine.ringtype = ringtemp[0];
 		dbg.initializeDepth();
 		dbg.initializeColor();
-
+#pragma region initialize_trackbar
 		ValueManager<UINT16> depthManager("values.xml");
 		depthManager.set_value("MINDEPTH", &dbg.MINDEPTH, 8000); depthManager.set_value("MAXDEPTH", &dbg.MAXDEPTH, 8000);
 		depthManager.trackbar("depth");
@@ -68,7 +68,7 @@ void adjustValues(std::string movieName_rgb, std::string movieName_depth) {
 		HSVManager.set_value("min_h", &dbg.hsvKeeper.min_h, 180); HSVManager.set_value("min_s", &dbg.hsvKeeper.min_s, 255); HSVManager.set_value("min_v", &dbg.hsvKeeper.min_v, 255);
 		HSVManager.set_value("max_h", &dbg.hsvKeeper.max_h, 180); HSVManager.set_value("max_s", &dbg.hsvKeeper.max_s, 255); HSVManager.set_value("max_v", &dbg.hsvKeeper.max_v, 255);
 		HSVManager.trackbar("HSV");
-
+#pragma endregion
 		std::cout << "0: movie mode\n1: camera mode" << std::endl;
 		int flag;
 		std::cin >> flag;
@@ -110,16 +110,26 @@ void adjustValues(std::string movieName_rgb, std::string movieName_depth) {
 	}
 }
 
-void saveMovie() {
+void saveMovie(std::string movieName_rgb, std::string movieName_depth) {
 	try {
 		KinectDebug dbg;
 		//É|Å[ÉãÇÃéÌóﬁÇäiî[
 		dbg.poleLine.ringtype = ringtemp[0];
-		dbg.initializeDepth();
+
 		dbg.initializeColor();
+		static cv::VideoWriter rgbWriter(movieName_rgb, cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(dbg.colorWidth, dbg.colorHeight), true);
+		dbg.initializeDepth();
+		static cv::VideoWriter depthWriter(movieName_depth, cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(dbg.depthWidth, dbg.depthHeight), false);
+
 		while (1) {
-			dbg.saveDepthMovie(movieName_depth);
-			dbg.saveRGBMovie(movieName_RGB);
+			dbg.setDepth();
+			dbg.setRGB();
+			depthWriter << dbg.depthImage;
+			cv::cvtColor(dbg.RGBImage, dbg.RGBImage,CV_BGRA2BGR);
+			rgbWriter << dbg.RGBImage;
+			cv::imshow("depthImage", dbg.depthImage);
+			dbg.showRGB();
+
 			auto key = cv::waitKey(1);
 			if (key == 'q') {
 				break;
@@ -137,7 +147,30 @@ void useMovie(std::string movieName_rgb, std::string movieName_depth) {
 		dbg.initializeDepth();
 		dbg.initializeColor();
 		dbg.poleLine.ringtype = ringtemp[0];
-		dbg.useMovie(movieName_rgb,movieName_depth);
+		static cv::VideoCapture cap_rgb(movieName_rgb), cap_depth(movieName_depth);
+		cv::Mat temp_rgb, temp_depth;
+
+
+		while (1) {
+			cap_rgb >> temp_rgb; cap_depth >> temp_depth;
+			if (temp_rgb.empty() || temp_depth.empty()) break;
+			auto key = cv::waitKey(1);
+			if (key == 'q') break;
+			else if (key == 's') cv::waitKey(0);
+			cv::cvtColor(temp_depth, dbg.depthImage, CV_RGB2GRAY);
+			dbg.binarization(dbg.depthImage, dbg.MINDEPTH, dbg.MAXDEPTH);
+			cv::medianBlur(dbg.depthImage, dbg.depthImage, 5);
+			dbg.showDistance();
+			dbg.getHoughLines(dbg.depthImage);
+
+			cvtColor(temp_rgb, dbg.RGBImage, CV_BGR2BGRA);
+			dbg.hsvKeeper.setHSVImage(dbg.RGBImage);
+			dbg.hsvKeeper.extractColor();
+			dbg.binarization(dbg.hsvKeeper.hsvImage, dbg.MINDEPTH, dbg.MAXDEPTH);
+			cv::medianBlur(dbg.hsvKeeper.hsvImage, dbg.hsvKeeper.hsvImage, 5);
+			dbg.hsvKeeper.showHSV();
+			dbg.getHoughLines(dbg.hsvKeeper.hsvImage);
+		}
 	}	
 	catch (std::exception& ex) {
 		std::cout << ex.what() << std::endl;

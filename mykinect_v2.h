@@ -14,56 +14,26 @@
         throw std::runtime_error( ss.str().c_str() );			\
     } \
 
-
-
 class MyKinectV2
 {
-protected:
-
+public:
+#pragma region CComPtr
 	CComPtr<IKinectSensor> kinect = nullptr;
 	CComPtr<IColorFrameReader> colorFrameReader = nullptr;
 	unsigned int colorBytesPerPixel;
 	ColorImageFormat colorFormat = ColorImageFormat::ColorImageFormat_Bgra;
 	CComPtr<IDepthFrameReader> depthFrameReader = nullptr;
 	CComPtr<ICoordinateMapper> coordinateMapper;
+#pragma endregion
 
-public:
 	~MyKinectV2();
 	MyKinectV2();
+
+#pragma region color
 
 	std::vector<BYTE> colorBuffer;
 	int colorWidth, colorHeight;
 	cv::Mat RGBImage;
-
-	std::vector<UINT16> depthBuffer;
-	int depthWidth, depthHeight; //523 424
-	int depthPointX, depthPointY;
-	const char* DepthWindowName = "Depth Image";
-	cv::Mat depthImage;
-
-
-	//poleLineを更新するフレーム
-	const int updateFrame = 8;
-	long long countFrame = 0;
-	class Pole {
-	public:
-		char ringtype;
-		int length;
-		cv::Vec4i line;
-		std::vector<int> top{ -1,-1 };
-		cv::Rect ringROI;
-		cv::Mat ringImage;
-		cv::Point shuttleXY, shuttleXY_suc;
-
-		Pole(int length, cv::Vec4i line) {
-			this->length = length;
-			this->line = line;
-		}
-		Pole() { this->length = -1; };
-	};
-
-	//ポール検出
-	Pole poleLine;
 
 	//colorに関する関数
 	void initializeColor();
@@ -92,11 +62,11 @@ public:
 		};
 		cv::Mat hsvImage;
 		void setHSVImage(cv::Mat &img) { cv::cvtColor(img, hsvImage, CV_RGB2HSV); };
-		void extractColor() { 
+		void extractColor() {
 			inRange(hsvImage, hsv_min, hsv_max, hsvImage);
 			cv::medianBlur(hsvImage, hsvImage, 3);
 		};
-		void showHSV() { 
+		void showHSV() {
 			cv::Mat img;
 			cv::resize(hsvImage, img, cv::Size(), 0.3, 0.3);
 			cv::imshow("HSVImage", img);
@@ -104,23 +74,50 @@ public:
 	};
 
 	HSVkeeper hsvKeeper;
+#pragma endregion
 
+#pragma region depth
+	std::vector<UINT16> depthBuffer;
+	int depthWidth, depthHeight; //523 424
+	int depthPointX, depthPointY;
+	const char* DepthWindowName = "Depth Image";
+	cv::Mat depthImage;
 
-	//depthに関する関数
 	virtual void initializeDepth();
 	void updateDepthFrame();
 	void setDepth();
 	//深度の範囲
 	UINT16 MINDEPTH = 3500, MAXDEPTH = 8000;
-	void binarization(cv::Mat &image, const int minDepth, const int maxDepth);
+#pragma endregion
 
-	void getShuttleLoc();
+#pragma region pole
+	const int updateFrame = 8;
+	long long countFrame = 0;
+	class Pole {
+	public:
+		char ringtype;
+		int length;
+		cv::Vec4i line;
+		std::vector<int> top{ -1,-1 };
+		cv::Rect ringROI;
+		cv::Mat ringImage;
+		cv::Point shuttleXY, shuttleXY_suc;
+
+		Pole(int length, cv::Vec4i line) {
+			this->length = length;
+			this->line = line;
+		}
+		Pole() { this->length = -1; };
+	};
+
+	Pole poleLine;
 
 	virtual void getHoughLines(cv::Mat& src);
 
 	//houghLinesの精度
 	const int RHO = 2, MINLINELENGTH = 180, MAXLINEGAP = 10, THRESHOLD = 50;
 	const double ANGLETHRESHOLD = 0.90;
+#pragma endregion
 
 	//シャトルコックの判定の閾値
 	const int FILTERTH =150;  //フィルター:これ以下の値は0にする
@@ -128,8 +125,8 @@ public:
 	const int KERNELSIZE = 10; //カーネルの長さ
 	const float SUCCESSTH = 0.9;  //リングの半径とシャトルコックの距離の比の閾値
 
-
-	//シャトルコックが通ったか判定
+	void binarization(cv::Mat &image, const int minDepth, const int maxDepth);
+	void getShuttleLoc();
 	virtual bool judgeCockThrough(); //ringtype=='g'でゴールデンシャトルコック用
 	virtual bool findShuttle();
 
