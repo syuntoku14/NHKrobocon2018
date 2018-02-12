@@ -10,13 +10,13 @@
 template<typename T>
 class ValueManager {
 public:
+#pragma region donttouch
 	class V {
 	public:
 		int slider;
 		T* value;
 		T max_value;
 	};
-
 	cv::FileStorage fs;
 	std::string filename;
 	std::map<std::string, V> values;
@@ -27,7 +27,15 @@ public:
 	~ValueManager() {
 		fs.release();
 	};
+	
+	static void onTrackbar(int, void *object) {
+		using namespace std;
+		V *val = (V*)object;
+		*val->value = (T)val->slider;
+	};
+#pragma endregion
 
+#pragma region functions
 	void get_value(std::string value_name, T *value) {
 		using  namespace cv;
 		fs.open(filename, FileStorage::READ);
@@ -55,16 +63,13 @@ public:
 		}
 	};
 
-	static void onTrackbar(int, void *object) {
-		using namespace std;
-		V *val = (V*)object;
-		*val->value=(T)val->slider;
-	};
 	void trackbar(std::string windowName) {
 		using namespace cv;
-		cv::namedWindow(windowName, CV_WINDOW_AUTOSIZE | CV_WINDOW_FREERATIO);
+		cv::namedWindow(windowName, CV_WINDOW_AUTOSIZE);
 		for (auto i = values.begin(); i != values.end(); ++i) {
 			createTrackbar(i->first, windowName, &i->second.slider, (int)i->second.max_value, &ValueManager::onTrackbar, &i->second);
 		}
 	};
+#pragma endregion
+
 };

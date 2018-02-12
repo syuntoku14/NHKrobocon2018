@@ -39,11 +39,6 @@ void KinectDebug::initializeDepth() {
 
 }
 
-void KinectDebug::showRGB() {
-	cv::Mat img;
-	cv::resize(RGBImage, img, cv::Size(), 0.3, 0.3);
-	cv::imshow("RGB", img);
-}
 void KinectDebug::showDistance() {
 	int index = (depthPointY * depthWidth) + depthPointX;
 	std::stringstream ss;
