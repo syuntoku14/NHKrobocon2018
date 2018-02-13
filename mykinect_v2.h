@@ -96,10 +96,12 @@ public:
 	void updateColorFrame();
 	void setRGB();
 	void setMappedRGB();
+	bool setRGBbyMovie(std::string movieName);
 
 	virtual void initializeDepth();
 	void updateDepthFrame();
 	void setDepth();
+	bool setDepthbyMovie(std::string movieName);
 	void showDistance();
 #pragma endregion
 

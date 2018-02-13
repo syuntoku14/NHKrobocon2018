@@ -83,8 +83,17 @@ void MyKinectV2::setMappedRGB() {
 			}
 		}
 	}
-	
+
 	RGBImage = cv::Mat(depthHeight, depthWidth, CV_8UC4, &buffer[0]).clone();
+}
+
+bool MyKinectV2::setRGBbyMovie(std::string movieName) {
+	static cv::VideoCapture cap(movieName);
+	cv::Mat temp;
+	cap >> temp;
+	if (temp.empty()) return false;
+	cv::cvtColor(temp, RGBImage, CV_BGR2BGRA);
+	return true;
 }
 
 void MyKinectV2::updateDepthFrame() {
@@ -142,6 +151,15 @@ void MyKinectV2::setDepth() {
 	for (int i = 0; i < depthImage.total(); i++) {
 		depthImage.data[i] = (UINT16)((depthBuffer[i] / 8000.0) * 255.0);
 	}
+}
+
+bool MyKinectV2::setDepthbyMovie(std::string movieName) {
+	static cv::VideoCapture cap(movieName);
+	cv::Mat temp;
+	cap >> temp;
+	if (temp.empty()) return false;
+	cv::cvtColor(temp, depthImage, CV_RGB2GRAY);
+	return true;
 }
 #pragma endregion
 
