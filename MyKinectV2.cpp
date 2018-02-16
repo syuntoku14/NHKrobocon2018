@@ -1,4 +1,4 @@
-#include"mykinect_v2.h"
+#include"MyKinectV2.h"
 
 MyKinectV2::MyKinectV2() {
 	// デフォルトのKinectを取得する
