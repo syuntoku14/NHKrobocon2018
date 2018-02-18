@@ -27,10 +27,11 @@ void test() {
 		if (!kinect.setRGBbyMovie("./faultMovies/RGB1.avi")) break;
 		cv::imshow("RGB", kinect.RGBImage);
 		kinect.setDepthbyMovie("./faultMovies/depth1.avi");
+		binarization(kinect.depthImage, 3000, 6000);
 		cv::imshow("depthImage", kinect.depthImage);
-		setPoleDatabyLSD(kinect.depthImage, poledata, 0);
+		setPoleDatabyLSD(kinect.depthImage, poledata, 100,0);
 		//setPoleDatabyHoughLine(kinect.depthImage, poledata, params);
-		showPoleLine(kinect.depthImage, poledata);
+		//showPoleLine(kinect.depthImage, poledata);
 		std::cout << "pole Length:" << poledata.length << std::endl;
 
 		auto key = cv::waitKey(1);

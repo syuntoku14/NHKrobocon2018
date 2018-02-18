@@ -83,7 +83,7 @@ void setPoleDatabyHoughLine(cv::Mat& src, PoleData &poledata, HoughLineParamater
 
 };
 
-void setPoleDatabyLSD(cv::Mat &img, PoleData &poledata, double angleThreshold) {
+void setPoleDatabyLSD(cv::Mat &img, PoleData &poledata,int lengthThreshold, double angleThreshold) {
 	using namespace cv;
 	using namespace std;
 	Mat dst;
@@ -91,17 +91,20 @@ void setPoleDatabyLSD(cv::Mat &img, PoleData &poledata, double angleThreshold) {
 	Ptr<LineSegmentDetector> ls = createLineSegmentDetector(LSD_REFINE_STD);
 	vector<Vec4f> lines;
 	ls->detect(dst, lines);
-
+	//// Show found lines
+	//Mat drawnLines(dst);
+	//ls->drawSegments(drawnLines, lines);
+	//imshow("Standard refinement", drawnLines);
 	auto v = [](PoleData m1, PoleData m2) {return m1.length < m2.length; };
 	priority_queue<PoleData, std::vector<PoleData>, decltype(v)> poles(v);
 
-	//一定以上の角度のものを抽出
+	//一定以上の角度,長さのものを抽出
 	for (size_t i = 0; i < lines.size(); i++) {
 		double angle = atan(abs(lines[i][1] - lines[i][3]) / (abs(lines[i][0] - lines[i][2]) + 1e-10));
 		if (lines[i][0] < 507 && lines[i][0]>5) { //端っこでバグる
 			if (angle > CV_PI / 2.0*angleThreshold) {
 				int length = (int)sqrt(pow((lines[i][0] - lines[i][2]), 2) + pow((lines[i][1] - lines[i][3]), 2));
-				poles.push(PoleData(length, lines[i]));
+				if(length>=lengthThreshold) poles.push(PoleData(length, lines[i]));
 			}
 		}
 	}
