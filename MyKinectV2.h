@@ -60,17 +60,13 @@ public:
 		int min_h, min_s, min_v;
 		int max_h, max_s, max_v;
 		cv::FileStorage fs;
-		HSVkeeper() {
-			fs.open("hsvValues.xml", cv::FileStorage::READ);
+#pragma endregion
+#pragma region functions
+		void setHSVvalues(std::string filename) {
+			fs.open(filename, cv::FileStorage::READ);
 			fs["min_h"] >> min_h; fs["min_s"] >> min_s; fs["min_v"] >> min_v;
 			fs["max_h"] >> max_h; fs["max_s"] >> max_s; fs["max_v"] >> max_v;
 			fs.release();
-			hsv_min = cv::Scalar(min_h, min_s, min_v);
-			hsv_max = cv::Scalar(max_h, max_s, max_v);
-		};
-#pragma endregion
-#pragma region functions
-		void setHSVvalues() {
 			hsv_min = cv::Scalar(min_h, min_s, min_v);
 			hsv_max = cv::Scalar(max_h, max_s, max_v);
 		};

@@ -1,17 +1,17 @@
 #pragma once
 #include"MyKinectV2.h"
 #include"xmlManage.h"
+#include<numeric>
 
-void binarization(cv::Mat& image, const int minDepth, const int maxDepth) {
-	double mid = 255 * minDepth / 8000.0, mxd = 255 * maxDepth / 8000.0;
-	for (int i = 0; i < image.total(); ++i) {
-		if (mid < image.data[i] && image.data[i] < mxd) {
-			image.data[i] = 255;  //2’l‰»
-		}
-		else {
-			image.data[i] = 0;
-		}
-	}
+class HoughLineParamaters {
+public:
+	int rho, threshold, minLineLength, maxLineGap;
+	double theta, angleThreshold;
+	HoughLineParamaters(int rho, double theta, int threshold, int minLineLength, int maxLineGap, double angleThreshold) {
+		this->rho = rho; this->theta = theta; this->threshold = threshold;
+		this->minLineLength = minLineLength; this->maxLineGap = maxLineGap;
+		this->angleThreshold = angleThreshold;
+	};
 };
 
 class PoleData {
@@ -21,6 +21,7 @@ public:
 	cv::Vec4i poleLine;
 	cv::Vec4f poleLine_f;
 	cv::Vec2i topPosition;
+	int poleDepth;
 	cv::Rect ringROI;
 	cv::Mat ringImage;
 	cv::Point shuttleXY;
@@ -52,19 +53,82 @@ public:
 	PoleData operator / (const float num) const {
 		return { poleLine_f / num };
 	};
-	PoleData() { this->length = -1; };
-};
-
-class HoughLineParamaters {
-public:
-	int rho, threshold, minLineLength, maxLineGap;
-	double theta, angleThreshold;
-	HoughLineParamaters(int rho, double theta, int threshold, int minLineLength, int maxLineGap, double angleThreshold) {
-		this->rho = rho; this->theta = theta; this->threshold = threshold;
-		this->minLineLength = minLineLength; this->maxLineGap = maxLineGap;
-		this->angleThreshold = angleThreshold;
+	PoleData() {
+		this->poleDepth = -1;
+		this->length = -1;
 	};
 };
+
+class ShuttleData {
+
+};
+
+void setPoleDepthbyKinect(PoleData &poledata, const std::vector<UINT16> &depthBuffer, const cv::Mat HSVImage) {
+	using namespace std;
+	auto x = (int)((poledata.poleLine[0] + poledata.poleLine[2]) / 2);
+	auto y = (int)((poledata.poleLine[1] + poledata.poleLine[3]) / 2);
+	auto cols = HSVImage.cols;
+	if (poledata.length > 0) {
+		for (int i = -5; i < 6; i++) {
+			auto coord = cols * y + max(0, x + i);
+			if (HSVImage.data[coord] > 200) {
+				poledata.poleDepth = depthBuffer[coord];
+				break;
+			}
+		}
+	}
+	std::cout << "poleDepth: " << poledata.poleDepth << endl;
+};
+
+void setPoleDepthbyMovie(PoleData &poledata, const cv::Mat depthImage, const cv::Mat HSVImage) {
+	auto x = (int)((poledata.poleLine[0] + poledata.poleLine[2]) / 2);
+	auto y = (int)((poledata.poleLine[1] + poledata.poleLine[3]) / 2);
+	if (poledata.length > 0) {
+		std::vector<float> depth;
+		for (int i = -5; i < 6; i++) {
+			auto intensity = HSVImage.at<unsigned char>(y, std::max(0, x + i));
+			if (intensity > 200) depth.push_back(((float)depthImage.at<unsigned char>(y, std::max(0, x + i))*8000.0 / 255.0));
+		}
+		depth.size() != 0 ? poledata.poleDepth = std::accumulate(depth.begin(), depth.end(), 0.0) / depth.size() : poledata.poleDepth = -1;
+	}
+	std::cout << "poleDepth: " << poledata.poleDepth << std::endl;
+}
+
+
+void binarization(cv::Mat& image, const int minDepth, const int maxDepth) {
+	double mid = 255 * minDepth / 8000.0, mxd = 255 * maxDepth / 8000.0;
+	for (int i = 0; i < image.total(); ++i) {
+		if (mid < image.data[i] && image.data[i] < mxd) {
+			image.data[i] = 255;  //2’l‰»
+		}
+		else {
+			image.data[i] = 0;
+		}
+	}
+};
+
+auto convBinarizaionByHsv(const cv::Mat &HSVImage, const cv::Mat &depthImage) {
+	using namespace cv;
+	Mat mask = Mat::zeros(HSVImage.rows, HSVImage.cols, CV_8UC1);
+	int upper, mid, lower;
+	for (int i = 0; i < HSVImage.total(); ++i) {
+		if (HSVImage.data[i] > 200) {
+			for (int delta = -1; delta < 2; delta++) {
+				upper = i - HSVImage.cols + delta;
+				mid = i + delta;
+				lower = i + HSVImage.cols + delta;
+				if (upper >= 0) mask.data[upper] = 1;
+				if (mid >= 0 and mid < HSVImage.total()) mask.data[mid] = 1;
+				if (lower < HSVImage.total()) mask.data[lower] = 1;
+			}
+		}
+	}
+	for (int i = 0; i < mask.total(); i++) {
+		mask.data[i] = depthImage.data[i] * mask.data[i];
+	}
+	return mask;
+}
+
 
 void setPoleDatabyHoughLine(cv::Mat& src, PoleData &poledata, HoughLineParamaters params) {
 	using namespace std;
@@ -103,12 +167,7 @@ auto setPoleDatabyLSD(cv::Mat &img, int lengthThreshold, double angleThreshold) 
 	using namespace cv;
 	using namespace std;
 	Mat dst;
-	medianBlur(img, dst, 7);
-	Mat kernel = (Mat_<float>(3, 3) << 1, 0, -1, 1, 0, -1, 1, 0, -1);
-	filter2D(dst, dst, -1, kernel);
-	Canny(dst, dst, 100, 500, 3, true);
-
-	imshow("canny", dst);
+	cv::Canny(img, dst, 100, 500, 3, true);
 	Ptr<LineSegmentDetector> ls = createLineSegmentDetector(LSD_REFINE_STD);
 	vector<Vec4f> lines;
 	ls->detect(dst, lines);
@@ -129,10 +188,6 @@ auto setPoleDatabyLSD(cv::Mat &img, int lengthThreshold, double angleThreshold) 
 
 	if (lines.size()) {
 		sort(endPoints.begin(), endPoints.end());
-		for (auto i = endPoints.begin(); i < endPoints.end(); i++) {
-			cout << i->first << endl;
-		}
-		cout << endl;
 		auto topPos = *endPoints.begin();
 		auto btmPos = *(endPoints.end() - 1);
 		return PoleData(Vec4f(topPos.second, topPos.first, btmPos.second, btmPos.first));
@@ -186,3 +241,34 @@ void saveRGBandDepthMovies(std::string movieName_rgb, std::string movieName_dept
 	}
 };
 
+auto findShuttleCoordinate_byTracking(cv::Mat HSVImage, ShuttleData &shuttledata) {
+	using namespace cv;
+	using namespace std;
+	Mat dst = HSVImage;
+	Mat element = Mat::ones(3, 3, CV_8UC1);
+	dilate(dst, dst, element, Point(-1, -1), 3); //–c’£ˆ—3‰ñ
+	vector<vector<Point> > contours;
+	findContours(dst, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_NONE);
+	double max_area = 0;
+	int max_area_contour = -1;
+	for (int j = 0; j < contours.size(); j++) {
+		double area = contourArea(contours.at(j));
+		if (max_area < area) {
+			max_area = area;
+			max_area_contour = j;
+		}
+
+		int count = contours.at(max_area_contour).size();
+		double x = 0;
+		double y = 0;
+		for (int k = 0; k < count; k++) {
+			x += contours.at(max_area_contour).at(k).x;
+			y += contours.at(max_area_contour).at(k).y;
+		}
+		x /= count;
+		y /= count;
+
+		//circle(dst, Point(x, y), 50, Scalar(0, 0, 255), 3, 4);
+		//imshow("centor",dst);
+	}
+}

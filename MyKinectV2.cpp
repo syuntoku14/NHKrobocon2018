@@ -174,3 +174,4 @@ void MyKinectV2::showDistance() {
 		0, 1, cv::Scalar(255, 255, 255));
 	cv::imshow("depthImage", depthImage);
 }
+
