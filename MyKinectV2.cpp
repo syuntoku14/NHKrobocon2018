@@ -17,6 +17,11 @@ MyKinectV2::~MyKinectV2()
 }
 
 #pragma region get_image
+
+void MyKinectV2::initializeMulti() {
+
+}
+
 void MyKinectV2::initializeColor() {
 	// カラーリーダーを取得する
 	CComPtr<IColorFrameSource> colorFrameSource;

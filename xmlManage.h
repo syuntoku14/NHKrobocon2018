@@ -61,6 +61,7 @@ public:
 			fs << itr->first << *itr->second.value;
 			values.erase(values.begin());
 		}
+		fs.release();
 	};
 
 	void trackbar(std::string windowName) {

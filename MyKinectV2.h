@@ -62,11 +62,15 @@ public:
 		cv::FileStorage fs;
 #pragma endregion
 #pragma region functions
-		void setHSVvalues(std::string filename) {
+
+		void initHSVvalues(std::string filename) {
 			fs.open(filename, cv::FileStorage::READ);
 			fs["min_h"] >> min_h; fs["min_s"] >> min_s; fs["min_v"] >> min_v;
 			fs["max_h"] >> max_h; fs["max_s"] >> max_s; fs["max_v"] >> max_v;
 			fs.release();
+		};
+
+		void setHSVvalues() {
 			hsv_min = cv::Scalar(min_h, min_s, min_v);
 			hsv_max = cv::Scalar(max_h, max_s, max_v);
 		};
@@ -89,7 +93,9 @@ public:
 #pragma endregion
 
 #pragma region functions
-	//colorÇ…ä÷Ç∑ÇÈä÷êî
+	void initializeMulti();
+	void updateMultiFrame();
+
 	void initializeColor();
 	void updateColorFrame();
 	void setRGB();
@@ -102,6 +108,4 @@ public:
 	bool setDepthbyMovie(std::string movieName);
 	void showDistance();
 #pragma endregion
-
-
 };

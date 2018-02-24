@@ -4,46 +4,28 @@
 #include"xmlManage.h"
 #include<iostream>
 #include<numeric>
+#include"PoleAndShuttlePrediction.h"
 
 //動画の保存先
 std::time_t now = std::time(nullptr);
 std::string movieName_depth = "./shuttleMovies/depth" + std::to_string(now) + ".avi";
 std::string movieName_RGB = "./shuttleMovies/RGB" + std::to_string(now) + ".avi";
 
-void test();
-void test2();
+void LSDtestByMovie();
+void LSDtestByKinect();
 void adjustValues(std::string movieName_rgb, std::string movieName_depth);
 
 //基本的に取れていないデータには-1が入る
 int main() {
-	//test();
-	adjustValues("./faultMovies/RGB1.avi", "./faultMovies/depth1.avi");
+	//saveRGBandDepthMovies(movieName_RGB,movieName_depth);
+	
+	//LSDtestByMovie();
+	adjustValues("./faultMovies/RGByellow.avi", "./faultMovies/depthyellow.avi");
 	return 0;
 }
 
-void test2() {
-	MyKinectV2 kinect;
-	kinect.initializeColor();
-	kinect.initializeDepth();
-	while (1) {
-		if (!kinect.setRGBbyMovie("./faultMovies/RGB1.avi")) break;
-		cv::imshow("RGB", kinect.RGBImage);
-		kinect.setDepthbyMovie("./faultMovies/depth1.avi");
-		binarization(kinect.depthImage, 3000, 7000);
-		kinect.hsvKeeper.setHSVImage(kinect.RGBImage);
-		kinect.hsvKeeper.extractColor();
-		cv::imshow("depthImage", kinect.depthImage);
-		cv::imshow("hsvImage", kinect.hsvKeeper.hsvImage);
-		convBinarizaionByHsv(kinect.hsvKeeper.hsvImage, kinect.depthImage); //depthImageを変換
-		cv::imshow("convedImage", kinect.depthImage);
 
-		auto key = cv::waitKey(1);
-		if (key == 'q') break;
-		else if (key == 's') cv::waitKey(0);
-	}
-}
-
-void test() {
+void LSDtestByMovie() {
 	using namespace std;
 	vector<PoleData> poledatas;
 	//savemovie(moviename_rgb,moviename_depth);
@@ -51,11 +33,12 @@ void test() {
 	kinect.initializeColor();
 	kinect.initializeDepth();
 	cv::Mat poleImage;
+	kinect.hsvKeeper.initHSVvalues("hsvValues_red.xml");
 	while (1) {
 		if (!kinect.setRGBbyMovie("./faultMovies/RGB1.avi")) break;
 		kinect.setDepthbyMovie("./faultMovies/depth1.avi");
 		cv::imshow("RGB", kinect.RGBImage);
-		kinect.hsvKeeper.setHSVvalues("hsvValues_red.xml");
+		kinect.hsvKeeper.setHSVvalues();
 		kinect.hsvKeeper.setHSVImage(kinect.RGBImage);
 		kinect.hsvKeeper.extractColor();
 		//cv::imshow("HSVImage", kinect.hsvKeeper.hsvImage);
@@ -71,6 +54,43 @@ void test() {
 		auto poledata = std::accumulate(poledatas.begin(), poledatas.end(), PoleData(cv::Vec4f(0.0, 0.0, 0.0, 0.0))) / (float)poledatas.size();
 		//setPoleDepthbyKinect(poledata, kinect.depthBuffer, kinect.hsvKeeper.hsvImage);
 		setPoleDepthbyMovie(poledata,kinect.depthImage,kinect.hsvKeeper.hsvImage);
+		showPoleLine(kinect.depthImage, poledata);
+
+		auto key = cv::waitKey(1);
+		if (key == 'q') break;
+		else if (key == 's') cv::waitKey(0);
+	}
+}
+
+void LSDtestByKinect() {
+	using namespace std;
+	vector<PoleData> poledatas;
+	//savemovie(moviename_rgb,moviename_depth);
+	MyKinectV2 kinect;
+	kinect.initializeColor();
+	kinect.initializeDepth();
+	cv::Mat poleImage;
+	kinect.hsvKeeper.initHSVvalues("hsvValues_yellow.xml");
+	while (1) {
+		kinect.setMappedRGB();
+		kinect.setDepth();
+		cv::imshow("RGB", kinect.RGBImage);
+		kinect.hsvKeeper.setHSVvalues();
+		kinect.hsvKeeper.setHSVImage(kinect.RGBImage);
+		kinect.hsvKeeper.extractColor();
+		//cv::imshow("HSVImage", kinect.hsvKeeper.hsvImage);
+		cv::imshow("depthImage", kinect.depthImage);
+		poleImage = convBinarizaionByHsv(kinect.hsvKeeper.hsvImage, kinect.depthImage); //poleImageを取得
+
+		auto tempdata = setPoleDatabyLSD(poleImage, 0, 0.90);
+		//poledataの平均を算出
+		if (tempdata.length > 0) {
+			poledatas.push_back(tempdata);
+			if (poledatas.size() > 3) poledatas.erase(poledatas.begin());
+		}
+		auto poledata = std::accumulate(poledatas.begin(), poledatas.end(), PoleData(cv::Vec4f(0.0, 0.0, 0.0, 0.0))) / (float)poledatas.size();
+		//setPoleDepthbyKinect(poledata, kinect.depthBuffer, kinect.hsvKeeper.hsvImage);
+		setPoleDepthbyMovie(poledata, kinect.depthImage, kinect.hsvKeeper.hsvImage);
 		showPoleLine(kinect.depthImage, poledata);
 
 		auto key = cv::waitKey(1);
@@ -111,6 +131,8 @@ void adjustValues(std::string movieName_RGB, std::string movieName_depth) {
 	HSVManager.trackbar("HSV");
 #pragma endregion
 	std::cout << hsvfile_name << std::endl;
+
+	kinect.hsvKeeper.initHSVvalues(hsvfile_name);
 	while (1) {
 		switch (flag) {
 		case 0:
@@ -127,7 +149,7 @@ void adjustValues(std::string movieName_RGB, std::string movieName_depth) {
 		cv::imshow("depthImage", kinect.depthImage);
 		cv::imshow("RGBImage", kinect.RGBImage);
 
-		kinect.hsvKeeper.setHSVvalues(hsvfile_name);
+		kinect.hsvKeeper.setHSVvalues();
 		kinect.hsvKeeper.setHSVImage(kinect.RGBImage);
 		kinect.hsvKeeper.extractColor();
 		cv::imshow("HSVImage", kinect.hsvKeeper.hsvImage);
