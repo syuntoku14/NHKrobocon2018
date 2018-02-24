@@ -25,6 +25,7 @@ public:
 	ColorImageFormat colorFormat = ColorImageFormat::ColorImageFormat_Bgra;
 	CComPtr<IDepthFrameReader> depthFrameReader = nullptr;
 	CComPtr<ICoordinateMapper> coordinateMapper;
+	CComPtr<IMultiSourceFrameReader> multiFrameReader = nullptr;
 
 	~MyKinectV2();
 	MyKinectV2();
@@ -107,5 +108,7 @@ public:
 	void setDepth();
 	bool setDepthbyMovie(std::string movieName);
 	void showDistance();
+
+	void setDepthandMappedRGB();
 #pragma endregion
 };

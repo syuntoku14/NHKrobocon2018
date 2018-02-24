@@ -18,8 +18,80 @@ MyKinectV2::~MyKinectV2()
 
 #pragma region get_image
 
-void MyKinectV2::initializeMulti() {
+template <class Interface> inline void safe_release(Interface **ppT)
+{
+	if (*ppT)
+	{
+		(*ppT)->Release();
+		*ppT = NULL;
+	}
+}
 
+void MyKinectV2::initializeMulti() {
+	auto ret = kinect->OpenMultiSourceFrameReader(
+		FrameSourceTypes::FrameSourceTypes_Depth | FrameSourceTypes::FrameSourceTypes_Color,
+		&multiFrameReader);
+
+	if (FAILED(ret)) {
+		safe_release(&multiFrameReader);
+		return;
+	}
+}
+
+void MyKinectV2::updateMultiFrame() {
+
+	IMultiSourceFrame* multiFrame = nullptr;
+	IDepthFrame* depthFrame = nullptr;
+	IDepthFrameReference* depthref = nullptr;
+	IColorFrame* colorFrame=nullptr;
+	IColorFrameReference* colorref = nullptr;
+
+	multiFrame = nullptr;
+	auto ret = multiFrameReader->AcquireLatestFrame(&multiFrame);
+	if (FAILED(ret)) {
+		safe_release(&multiFrame);
+		return;
+	}
+	depthFrame=nullptr;
+	depthref = nullptr;
+	ret=multiFrame->get_DepthFrameReference(&depthref);
+	if (FAILED(ret)) {
+		safe_release(&depthref);
+		return;
+	}
+	ret=depthref->AcquireFrame(&depthFrame);
+	if (FAILED(ret)) {
+		safe_release(&depthref);
+		return;
+	}
+	colorFrame=nullptr;
+	colorref = nullptr;
+	ret=multiFrame->get_ColorFrameReference(&colorref);
+	if (FAILED(ret)) {
+		safe_release(&depthref);
+		return;
+	}
+	ret = colorref->AcquireFrame(&colorFrame);
+	if (FAILED(ret)) {
+		safe_release(&depthref);
+		return;
+	}
+
+	ret=colorFrame->CopyConvertedFrameDataToArray(
+		colorBuffer.size(), &colorBuffer[0], colorFormat);
+	if (FAILED(ret)) {
+		safe_release(&depthref);
+		return;
+	}
+	ret=depthFrame->CopyFrameDataToArray(
+		depthBuffer.size(), &depthBuffer[0]);
+	if (FAILED(ret)) {
+		safe_release(&depthref);
+		return;
+	}
+	multiFrame->Release(); 
+	depthFrame->Release(); depthref->Release(); 
+	colorFrame->Release(); colorref->Release();
 }
 
 void MyKinectV2::initializeColor() {
@@ -66,8 +138,40 @@ void MyKinectV2::setRGB() {
 }
 
 void MyKinectV2::setMappedRGB() {
-	updateColorFrame();
+	//updateColorFrame();
+	//updateMultiFrame();
 	// Retrieve Mapped Coordinates
+	std::vector<ColorSpacePoint> colorSpacePoints(depthWidth * depthHeight);
+	ERROR_CHECK(coordinateMapper->MapDepthFrameToColorSpace(depthBuffer.size(), &depthBuffer[0], colorSpacePoints.size(), &colorSpacePoints[0]));
+	// Mapped Color Buffer
+	std::vector<BYTE> buffer(depthWidth * depthHeight * colorBytesPerPixel);
+
+	// Mapping Color Data to Depth Resolution
+	for (int depthY = 0; depthY < depthHeight; depthY++) {
+		for (int depthX = 0; depthX < depthWidth; depthX++) {
+			const unsigned int depthIndex = depthY * depthWidth + depthX;
+			const int colorX = static_cast<int>(colorSpacePoints[depthIndex].X + 0.5f);
+			const int colorY = static_cast<int>(colorSpacePoints[depthIndex].Y + 0.5f);
+			if ((0 <= colorX) && (colorX < colorWidth) && (0 <= colorY) && (colorY < colorHeight)) {
+				const unsigned int colorIndex = colorY * colorWidth + colorX;
+				buffer[depthIndex * colorBytesPerPixel + 0] = colorBuffer[colorIndex * colorBytesPerPixel + 0];
+				buffer[depthIndex * colorBytesPerPixel + 1] = colorBuffer[colorIndex * colorBytesPerPixel + 1];
+				buffer[depthIndex * colorBytesPerPixel + 2] = colorBuffer[colorIndex * colorBytesPerPixel + 2];
+				buffer[depthIndex * colorBytesPerPixel + 3] = colorBuffer[colorIndex * colorBytesPerPixel + 3];
+			}
+		}
+	}
+
+	RGBImage = cv::Mat(depthHeight, depthWidth, CV_8UC4, &buffer[0]).clone();
+}
+void MyKinectV2::setDepthandMappedRGB() {
+	updateMultiFrame();
+
+	depthImage = cv::Mat(depthHeight, depthWidth, CV_8UC1);
+	for (int i = 0; i < depthImage.total(); i++) {
+		depthImage.data[i] = (UINT16)((depthBuffer[i] / 8000.0) * 255.0);
+	}
+
 	std::vector<ColorSpacePoint> colorSpacePoints(depthWidth * depthHeight);
 	ERROR_CHECK(coordinateMapper->MapDepthFrameToColorSpace(depthBuffer.size(), &depthBuffer[0], colorSpacePoints.size(), &colorSpacePoints[0]));
 	// Mapped Color Buffer
@@ -99,19 +203,6 @@ bool MyKinectV2::setRGBbyMovie(std::string movieName) {
 	if (temp.empty()) return false;
 	cv::cvtColor(temp, RGBImage, CV_BGR2BGRA);
 	return true;
-}
-
-void MyKinectV2::updateDepthFrame() {
-	// Depthフレームを取得する
-	CComPtr<IDepthFrame> depthFrame;
-	auto ret = depthFrameReader->AcquireLatestFrame(&depthFrame);
-	if (ret != S_OK) {
-		return;
-	}
-
-	// データを取得する
-	ERROR_CHECK(depthFrame->CopyFrameDataToArray(
-		depthBuffer.size(), &depthBuffer[0]));
 }
 
 void MyKinectV2::initializeDepth() {
@@ -150,9 +241,24 @@ void MyKinectV2::initializeDepth() {
 
 }
 
+void MyKinectV2::updateDepthFrame() {
+	// Depthフレームを取得する
+	CComPtr<IDepthFrame> depthFrame;
+	auto ret = depthFrameReader->AcquireLatestFrame(&depthFrame);
+	if (ret != S_OK) {
+		return;
+	}
+
+	// データを取得する
+	ERROR_CHECK(depthFrame->CopyFrameDataToArray(
+		depthBuffer.size(), &depthBuffer[0]));
+}
+
 void MyKinectV2::setDepth() {
-	updateDepthFrame();
+	//updateDepthFrame();
+	updateMultiFrame();
 	depthImage = cv::Mat(depthHeight, depthWidth, CV_8UC1);
+	///depthImage = cv::Mat(424, 512, CV_8UC1);
 	for (int i = 0; i < depthImage.total(); i++) {
 		depthImage.data[i] = (UINT16)((depthBuffer[i] / 8000.0) * 255.0);
 	}

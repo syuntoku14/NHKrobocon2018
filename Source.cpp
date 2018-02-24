@@ -11,6 +11,7 @@ std::time_t now = std::time(nullptr);
 std::string movieName_depth = "./shuttleMovies/depth" + std::to_string(now) + ".avi";
 std::string movieName_RGB = "./shuttleMovies/RGB" + std::to_string(now) + ".avi";
 
+void test();
 void LSDtestByMovie();
 void LSDtestByKinect();
 void adjustValues(std::string movieName_rgb, std::string movieName_depth);
@@ -18,12 +19,28 @@ void adjustValues(std::string movieName_rgb, std::string movieName_depth);
 //基本的に取れていないデータには-1が入る
 int main() {
 	//saveRGBandDepthMovies(movieName_RGB,movieName_depth);
-	
+	//test();
+	LSDtestByKinect();
 	//LSDtestByMovie();
-	adjustValues("./faultMovies/RGByellow.avi", "./faultMovies/depthyellow.avi");
+	//adjustValues("./faultMovies/RGByellow.avi", "./faultMovies/depthyellow.avi");
 	return 0;
 }
 
+void test() {
+	using namespace cv;
+	MyKinectV2 kinect;
+	kinect.initializeColor();
+	kinect.initializeDepth();
+	kinect.initializeMulti();
+	while (1) {
+		kinect.setDepthandMappedRGB();
+		imshow("rgb", kinect.RGBImage);
+		imshow("depth", kinect.depthImage);
+		auto key = cv::waitKey(1);
+		if (key == 'q') break;
+		else if (key == 's') cv::waitKey(0);
+	}
+}
 
 void LSDtestByMovie() {
 	using namespace std;
@@ -69,11 +86,11 @@ void LSDtestByKinect() {
 	MyKinectV2 kinect;
 	kinect.initializeColor();
 	kinect.initializeDepth();
+	kinect.initializeMulti();
 	cv::Mat poleImage;
 	kinect.hsvKeeper.initHSVvalues("hsvValues_yellow.xml");
 	while (1) {
-		kinect.setMappedRGB();
-		kinect.setDepth();
+		kinect.setDepthandMappedRGB();
 		cv::imshow("RGB", kinect.RGBImage);
 		kinect.hsvKeeper.setHSVvalues();
 		kinect.hsvKeeper.setHSVImage(kinect.RGBImage);
