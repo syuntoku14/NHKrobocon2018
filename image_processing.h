@@ -45,12 +45,12 @@ void saveRGBandDepthMovies(std::string movieName_rgb, std::string movieName_dept
 
 		kinect.initializeColor();
 		kinect.initializeDepth();
+		kinect.initializeMulti();
 		static cv::VideoWriter rgbWriter(movieName_rgb, cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(kinect.depthWidth, kinect.depthHeight), true);
 		static cv::VideoWriter depthWriter(movieName_depth, cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(kinect.depthWidth, kinect.depthHeight), false);
 
 		while (1) {
-			kinect.setDepth();
-			kinect.setMappedRGB();
+			kinect.setDepthandMappedRGB();
 			cv::Mat img;
 			cv::cvtColor(kinect.RGBImage, img, CV_BGRA2BGR);
 			depthWriter << kinect.depthImage;

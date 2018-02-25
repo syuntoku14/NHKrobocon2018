@@ -18,7 +18,7 @@ public:
 class PoleData {
 public:
 	char ringtype;
-	int length;
+	float length;
 	cv::Vec4i poleLine;
 	cv::Vec4f poleLine_f;
 	cv::Vec2i topPosition;
@@ -26,11 +26,11 @@ public:
 	cv::Rect ringROI;
 	cv::Mat ringImage;
 	cv::Point shuttleXY;
-	PoleData(int length, cv::Vec4i line) {
+	PoleData(float length, cv::Vec4i line) {
 		this->length = length;
 		this->poleLine = line;
 	};
-	PoleData(int length, cv::Vec4f line) {
+	PoleData(float length, cv::Vec4f line) {
 		this->length = length;
 		this->poleLine_f = line;
 		for (int i = 0; i < 4; i++) {
@@ -42,7 +42,7 @@ public:
 		this->poleLine = line;
 	};
 	PoleData(cv::Vec4f line) {
-		this->length = (int)sqrt(pow((line[0] - line[2]), 2) + pow((line[1] - line[3]), 2));
+		this->length = sqrt(pow((line[0] - line[2]), 2) + pow((line[1] - line[3]), 2));
 		this->poleLine_f = line;
 		for (int i = 0; i < 4; i++) {
 			poleLine[i] = (int)poleLine_f[i];
@@ -108,7 +108,7 @@ void setPoleDatabyHoughLine(cv::Mat& src, PoleData &poledata, HoughLineParamater
 		double angle = atan(abs(lines[i][1] - lines[i][3]) / (abs(lines[i][0] - lines[i][2]) + 1e-10));
 		if (lines[i][0] < 507 && lines[i][0]>5) { //端っこでバグる
 			if (angle > CV_PI / 2.0*params.angleThreshold) {
-				int length = (int)sqrt(pow((lines[i][0] - lines[i][2]), 2) + pow((lines[i][1] - lines[i][3]), 2));
+				float length = sqrt(pow((lines[i][0] - lines[i][2]), 2) + pow((lines[i][1] - lines[i][3]), 2));
 				poles.push(PoleData(length, lines[i]));
 			}
 		}
@@ -124,35 +124,86 @@ void setPoleDatabyHoughLine(cv::Mat& src, PoleData &poledata, HoughLineParamater
 
 };
 
+bool comp(cv::Vec4f& left, cv::Vec4f& right) {
+	return left[1] == right[1] ? left[3] > right[3] : left[1] > right[1];
+}
+
+auto merge_lines(std::vector<cv::Vec4f>& lines) {
+	using namespace std; using namespace cv;
+
+	vector<Vec4f> mergedLines;
+	mergedLines.push_back(lines.back()); lines.pop_back();
+	cout << mergedLines[0] << endl;
+	while (lines.size() > 0) { //x方向に近い直線を合成
+		auto popped_line = lines.back(); lines.pop_back();
+		bool merged_flag = false;
+		for (auto &merged_line: mergedLines) {
+			auto popped_x = (popped_line[0] + popped_line[2]) / 2.0; auto merged_x = (merged_line[0] + merged_line[2]) / 2.0;
+
+			if (abs(popped_x - merged_x) < 15 && (merged_line[3]+20 > popped_line[1])) { 
+				auto x0 = (merged_line[0] + popped_line[0]) / 2.0; auto x2 = (merged_line[2] + popped_line[2]) / 2.0;
+				merged_line[2] = x2;	
+				merged_line[3] = max(merged_line[3], popped_line[3]);
+				merged_flag = true;
+				break;
+			}
+		}
+		if(!merged_flag) mergedLines.push_back(popped_line); //該当しないので追加
+	}
+	cout << mergedLines[0] << endl;
+	cout << mergedLines.size() << endl;
+
+	return mergedLines;
+}
+
 auto setPoleDatabyLSD(cv::Mat &img, int lengthThreshold, double angleThreshold) {
 	using namespace cv;
 	using namespace std;
 	Mat dst;
-	cv::Canny(img, dst, 100, 500, 3, true);
+	cv::Canny(img, dst, 50, 200, 3, true);
 	Ptr<LineSegmentDetector> ls = createLineSegmentDetector(LSD_REFINE_STD);
 	vector<Vec4f> lines;
 	ls->detect(dst, lines);
 
-	//(y,x)の順
-	vector<pair<float, float> >endPoints;
+	//Mat drawnLines_base(dst);
+	//ls->drawSegments(drawnLines_base, lines);
+	//imshow("base", drawnLines_base);
+	
+	vector<Vec4f> validLines;
 
 	//一定以上の角度,長さのものを抽出
 	for (size_t i = 0; i < lines.size(); i++) {
-		double angle = atan(abs(lines[i][1] - lines[i][3]) / (abs(lines[i][0] - lines[i][2]) + 1e-10));
-		int length = (int)sqrt(pow((lines[i][0] - lines[i][2]), 2) + pow((lines[i][1] - lines[i][3]), 2));
+		if (lines[i][1] > lines[i][3]) { //[1]<[3]とする
+			auto temp_x = lines[i][0]; lines[i][0] = lines[i][2]; lines[i][2] = temp_x;
+			auto temp_y = lines[i][1]; lines[i][1] = lines[i][3]; lines[i][3] = temp_y;
+		}
+		auto angle = atan(abs(lines[i][1] - lines[i][3]) / (abs(lines[i][0] - lines[i][2]) + 1e-10));
+		auto length = sqrt(pow((lines[i][0] - lines[i][2]), 2) + pow((lines[i][1] - lines[i][3]), 2));
 		if (lines[i][0] < 507 && lines[i][0]>5) { //端っこでバグる
 			if (angle > CV_PI / 2.0*angleThreshold && length > lengthThreshold) {
-				endPoints.push_back(make_pair(lines[i][1], lines[i][0]));
-				endPoints.push_back(make_pair(lines[i][3], lines[i][2]));
+				validLines.push_back(lines[i]);
 			}
 		}
 	}
 
-	if (lines.size()) {
-		sort(endPoints.begin(), endPoints.end());
-		auto topPos = *endPoints.begin();
-		auto btmPos = *(endPoints.end() - 1);
-		return PoleData(Vec4f(topPos.second, topPos.first, btmPos.second, btmPos.first));
+	if (validLines.size()) {
+		sort(validLines.begin(), validLines.end(), comp); //yが小さいものが後ろ
+		auto mergedLines = merge_lines(validLines);
+		// Show found lines
+		Mat drawnLines(dst);
+		ls->drawSegments(drawnLines, mergedLines);
+		imshow("Standard refinement", drawnLines);
+
+		auto max_length = 0.0;
+		Vec4f longest_line = mergedLines[0];
+		for (auto &merged_line : mergedLines) {
+			auto length_merged= sqrt(pow((merged_line[0] - merged_line[2]), 2) + pow((merged_line[1] - merged_line[3]), 2));
+			if (max_length < length_merged) {
+				max_length = length_merged; longest_line = merged_line; 
+			}
+		}
+		std::cout << max_length << std::endl;
+		return PoleData(longest_line);
 	}
 
 	return PoleData();
