@@ -133,7 +133,6 @@ auto merge_lines(std::vector<cv::Vec4f>& lines) {
 
 	vector<Vec4f> mergedLines;
 	mergedLines.push_back(lines.back()); lines.pop_back();
-	cout << mergedLines[0] << endl;
 	while (lines.size() > 0) { //x•ûŒü‚É‹ß‚¢’¼ü‚ğ‡¬
 		auto popped_line = lines.back(); lines.pop_back();
 		bool merged_flag = false;
@@ -150,8 +149,6 @@ auto merge_lines(std::vector<cv::Vec4f>& lines) {
 		}
 		if(!merged_flag) mergedLines.push_back(popped_line); //ŠY“–‚µ‚È‚¢‚Ì‚Å’Ç‰Á
 	}
-	cout << mergedLines[0] << endl;
-	cout << mergedLines.size() << endl;
 
 	return mergedLines;
 }
@@ -164,10 +161,6 @@ auto setPoleDatabyLSD(cv::Mat &img, int lengthThreshold, double angleThreshold) 
 	Ptr<LineSegmentDetector> ls = createLineSegmentDetector(LSD_REFINE_STD);
 	vector<Vec4f> lines;
 	ls->detect(dst, lines);
-
-	//Mat drawnLines_base(dst);
-	//ls->drawSegments(drawnLines_base, lines);
-	//imshow("base", drawnLines_base);
 	
 	vector<Vec4f> validLines;
 
@@ -189,10 +182,10 @@ auto setPoleDatabyLSD(cv::Mat &img, int lengthThreshold, double angleThreshold) 
 	if (validLines.size()) {
 		sort(validLines.begin(), validLines.end(), comp); //y‚ª¬‚³‚¢‚à‚Ì‚ªŒã‚ë
 		auto mergedLines = merge_lines(validLines);
-		// Show found lines
-		Mat drawnLines(dst);
-		ls->drawSegments(drawnLines, mergedLines);
-		imshow("Standard refinement", drawnLines);
+		//// Show found lines
+		//Mat drawnLines(dst);
+		//ls->drawSegments(drawnLines, mergedLines);
+		//imshow("Standard refinement", drawnLines);
 
 		auto max_length = 0.0;
 		Vec4f longest_line = mergedLines[0];
@@ -202,7 +195,6 @@ auto setPoleDatabyLSD(cv::Mat &img, int lengthThreshold, double angleThreshold) 
 				max_length = length_merged; longest_line = merged_line; 
 			}
 		}
-		std::cout << max_length << std::endl;
 		return PoleData(longest_line);
 	}
 

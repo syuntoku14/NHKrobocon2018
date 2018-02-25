@@ -49,20 +49,22 @@ void LSDtestByMovie() {
 	MyKinectV2 kinect;
 	kinect.initializeColor();
 	kinect.initializeDepth();
-	cv::Mat poleImage;
-	kinect.hsvKeeper.initHSVvalues("hsvValues_yellow.xml");
+	cv::Mat convedImage;
+	kinect.hsvKeeper.initHSVvalues("hsvValues_red.xml");
+	int countFrame = 0;
 	while (1) {
-		if (!kinect.setRGBbyMovie("./faultMovies/RGByellow.avi")) break;
-		kinect.setDepthbyMovie("./faultMovies/depthyellow.avi");
+		if (!kinect.setRGBbyMovie("./faultMovies/RGB1.avi")) break;
+		kinect.setDepthbyMovie("./faultMovies/depth1.avi");
 		cv::imshow("RGB", kinect.RGBImage);
 		kinect.hsvKeeper.setHSVvalues();
 		kinect.hsvKeeper.setHSVImage(kinect.RGBImage);
 		kinect.hsvKeeper.extractColor();
 		//cv::imshow("HSVImage", kinect.hsvKeeper.hsvImage);
 		cv::imshow("depthImage", kinect.depthImage);
-		poleImage=convBinarizaionByHsv(kinect.hsvKeeper.hsvImage, kinect.depthImage); //poleImage‚ðŽæ“¾
-		cv::imshow("poleImage", poleImage);
-		auto tempdata = setPoleDatabyLSD(poleImage, 0, 0.90);
+		convedImage=convBinarizaionByHsv(kinect.hsvKeeper.hsvImage, kinect.depthImage); //convedImage‚ðŽæ“¾
+		cv::imshow("convedImage", convedImage);
+		auto tempdata = setPoleDatabyLSD(convedImage, 0, 0.90);
+		
 		//poledata‚Ì•½‹Ï‚ðŽZo
 		if (tempdata.length > 0) {
 			poledatas.push_back(tempdata);
@@ -75,6 +77,7 @@ void LSDtestByMovie() {
 		auto key = cv::waitKey(1);
 		if (key == 'q') break;
 		else if (key == 's') cv::waitKey(0);
+		countFrame++;
 	}
 }
 
@@ -86,8 +89,8 @@ void LSDtestByKinect() {
 	kinect.initializeColor();
 	kinect.initializeDepth();
 	kinect.initializeMulti();
-	cv::Mat poleImage;
-	kinect.hsvKeeper.initHSVvalues("hsvValues_yellow.xml");
+	cv::Mat convedImage;
+	kinect.hsvKeeper.initHSVvalues("hsvValues_red.xml");
 	while (1) {
 		kinect.setDepthandMappedRGB();
 		cv::imshow("RGB", kinect.RGBImage);
@@ -96,18 +99,18 @@ void LSDtestByKinect() {
 		kinect.hsvKeeper.extractColor();
 		//cv::imshow("HSVImage", kinect.hsvKeeper.hsvImage);
 		cv::imshow("depthImage", kinect.depthImage);
-		poleImage = convBinarizaionByHsv(kinect.hsvKeeper.hsvImage, kinect.depthImage); //poleImage‚ðŽæ“¾
-		auto tempdata = setPoleDatabyLSD(poleImage, 0, 0.90);
+		convedImage = convBinarizaionByHsv(kinect.hsvKeeper.hsvImage, kinect.depthImage); //convedImage‚ðŽæ“¾
+		auto tempdata = setPoleDatabyLSD(convedImage, 0, 0.90);
 		
-		////poledata‚Ì•½‹Ï‚ðŽZo
-		//if (tempdata.length > 0) {
-		//	poledatas.push_back(tempdata);
-		//	if (poledatas.size() > 3) poledatas.erase(poledatas.begin());
-		//}
-		//auto poledata = std::accumulate(poledatas.begin(), poledatas.end(), PoleData(cv::Vec4f(0.0, 0.0, 0.0, 0.0))) / (float)poledatas.size();
-		////setPoleDepthbyKinect(poledata, kinect.depthBuffer, kinect.hsvKeeper.hsvImage);
-		//setPoleDepthbyMovie(poledata, kinect.depthImage, kinect.hsvKeeper.hsvImage);
-		//showPoleLine(kinect.depthImage, poledata);
+		//poledata‚Ì•½‹Ï‚ðŽZo
+		if (tempdata.length > 0) {
+			poledatas.push_back(tempdata);
+			if (poledatas.size() > 3) poledatas.erase(poledatas.begin());
+		}
+		auto poledata = std::accumulate(poledatas.begin(), poledatas.end(), PoleData(cv::Vec4f(0.0, 0.0, 0.0, 0.0))) / (float)poledatas.size();
+		//setPoleDepthbyKinect(poledata, kinect.depthBuffer, kinect.hsvKeeper.hsvImage);
+		setPoleDepthbyMovie(poledata, kinect.depthImage, kinect.hsvKeeper.hsvImage);
+		showPoleLine(kinect.depthImage, poledata);
 
 		auto key = cv::waitKey(1);
 		if (key == 'q') break;
