@@ -19,53 +19,46 @@ class PoleData {
 public:
 	char ringtype;
 	float length;
-	cv::Vec4i poleLine;
-	cv::Vec4f poleLine_f;
-	cv::Vec2i topPosition;
+	bool found_flag = false;
 	int poleDepth;
+
+	cv::Vec4i poledata;
+	cv::Vec4f poledata_f;
+	std::vector<cv::Vec4f> poledata_stack;
+	cv::Vec2i topPosition; //(x,y)
+	std::vector<cv::Vec2i> topPosition_stack;
+	const int stack_capa = 3;
+
 	cv::Rect ringROI;
 	cv::Mat ringImage;
 	cv::Point shuttleXY;
-	PoleData(float length, cv::Vec4i line) {
-		this->length = length;
-		this->poleLine = line;
-	};
-	PoleData(float length, cv::Vec4f line) {
-		this->length = length;
-		this->poleLine_f = line;
-		for (int i = 0; i < 4; i++) {
-			poleLine[i] = (int)poleLine_f[i];
-		}
-	};
-	PoleData(cv::Vec4i line) {
-		this->length = (int)sqrt(pow((line[0] - line[2]), 2) + pow((line[1] - line[3]), 2));
-		this->poleLine = line;
-	};
-	PoleData(cv::Vec4f line) {
+
+	void setpoledata(cv::Vec4f line) {
+		this->found_flag = true;
 		this->length = sqrt(pow((line[0] - line[2]), 2) + pow((line[1] - line[3]), 2));
-		this->poleLine_f = line;
+		this->poledata_f = line;
 		for (int i = 0; i < 4; i++) {
-			poleLine[i] = (int)poleLine_f[i];
+			poledata[i] = (int)poledata_f[i];
 		}
-	};
-	PoleData operator +(const PoleData& other) const {
-		return { poleLine_f + other.poleLine_f };
-	};
-	PoleData operator / (const float num) const {
-		return { poleLine_f / num };
-	};
+		if (line[3] > line[1]) { this->topPosition[0] = (int)line[0]; this->topPosition[1] = (int)line[1]; }
+		else { this->topPosition[0] = (int)line[2]; this->topPosition[1] = (int)line[3]; }
+		//poledata_stackÇ…ÉfÅ[É^ÇíôÇﬂÇƒÇ¢Ç≠
+		poledata_stack.push_back(poledata);
+		if (poledata_stack.size() > stack_capa) poledata_stack.erase(poledata_stack.begin());
+		poledata = std::accumulate(poledata_stack.begin(), poledata_stack.end(), cv::Vec4f::all(0.0)) / (float)poledata_stack.size();
+	}
+
 	PoleData() {
-		this->poleDepth = -1;
-		this->length = -1;
-	};
+		this->found_flag = false;
+	}
 };
 
 void setPoleDepthbyKinect(PoleData &poledata, const std::vector<UINT16> &depthBuffer, const cv::Mat HSVImage) {
 	using namespace std;
-	auto x = (int)((poledata.poleLine[0] + poledata.poleLine[2]) / 2);
-	auto y = (int)((poledata.poleLine[1] + poledata.poleLine[3]) / 2);
+	auto x = (int)((poledata.poledata[0] + poledata.poledata[2]) / 2);
+	auto y = (int)((poledata.poledata[1] + poledata.poledata[3]) / 2);
 	auto cols = HSVImage.cols;
-	if (poledata.length > 0) {
+	if (poledata.found_flag) {
 		for (int i = -5; i < 6; i++) {
 			auto coord = cols * y + max(0, x + i);
 			if (HSVImage.data[coord] > 200) {
@@ -78,9 +71,9 @@ void setPoleDepthbyKinect(PoleData &poledata, const std::vector<UINT16> &depthBu
 };
 
 void setPoleDepthbyMovie(PoleData &poledata, const cv::Mat depthImage, const cv::Mat HSVImage) {
-	auto x = (int)((poledata.poleLine[0] + poledata.poleLine[2]) / 2);
-	auto y = (int)((poledata.poleLine[1] + poledata.poleLine[3]) / 2);
-	if (poledata.length > 0) {
+	auto x = (int)((poledata.poledata[0] + poledata.poledata[2]) / 2);
+	auto y = (int)((poledata.poledata[1] + poledata.poledata[3]) / 2);
+	if (poledata.found_flag) {
 		std::vector<float> depth;
 		for (int i = -5; i < 6; i++) {
 			auto intensity = HSVImage.at<unsigned char>(y, std::max(0, x + i));
@@ -89,40 +82,40 @@ void setPoleDepthbyMovie(PoleData &poledata, const cv::Mat depthImage, const cv:
 		depth.size() != 0 ? poledata.poleDepth = std::accumulate(depth.begin(), depth.end(), 0.0) / depth.size() : poledata.poleDepth = -1;
 	}
 	std::cout << "poleDepth: " << poledata.poleDepth << std::endl;
-}
-
-void setPoleDatabyHoughLine(cv::Mat& src, PoleData &poledata, HoughLineParamaters params) {
-	using namespace std;
-	using namespace cv;
-
-	Mat dst;
-	vector<Vec4i> lines;
-	Canny(src, dst, 50, 200, 3);
-	HoughLinesP(dst, lines, params.rho, params.theta, params.threshold, params.minLineLength, params.maxLineGap);
-
-	auto v = [](PoleData m1, PoleData m2) {return m1.length < m2.length; };
-	priority_queue<PoleData, std::vector<PoleData>, decltype(v)> poles(v);
-
-	//àÍíËà»è„ÇÃäpìxÇÃÇ‡ÇÃÇíäèo
-	for (size_t i = 0; i < lines.size(); i++) {
-		double angle = atan(abs(lines[i][1] - lines[i][3]) / (abs(lines[i][0] - lines[i][2]) + 1e-10));
-		if (lines[i][0] < 507 && lines[i][0]>5) { //í[Ç¡Ç±Ç≈ÉoÉOÇÈ
-			if (angle > CV_PI / 2.0*params.angleThreshold) {
-				float length = sqrt(pow((lines[i][0] - lines[i][2]), 2) + pow((lines[i][1] - lines[i][3]), 2));
-				poles.push(PoleData(length, lines[i]));
-			}
-		}
-	}
-
-	if (!poles.empty()) {
-		//í∑Ç≥Ç™ç≈ëÂÇÃlineÇpoledataÇ…äiî[
-		poledata = poles.top();
-		//í∏ì_èÓïÒÇäiî[
-		if (poledata.poleLine[1] >= poledata.poleLine[3]) { poledata.topPosition[0] = poledata.poleLine[2]; poledata.topPosition[1] += poledata.poleLine[3]; }
-		else { poledata.topPosition[0] = poledata.poleLine[0]; poledata.topPosition[1] += poledata.poleLine[1]; }
-	}
-
 };
+
+//void setPoleDatabyHoughLine(cv::Mat& src, PoleData &poledata, HoughLineParamaters params) {
+//	using namespace std;
+//	using namespace cv;
+//
+//	Mat dst;
+//	vector<Vec4i> lines;
+//	Canny(src, dst, 50, 200, 3);
+//	HoughLinesP(dst, lines, params.rho, params.theta, params.threshold, params.minLineLength, params.maxLineGap);
+//
+//	auto v = [](PoleData m1, PoleData m2) {return m1.length < m2.length; };
+//	priority_queue<PoleData, std::vector<PoleData>, decltype(v)> poles(v);
+//
+//	//àÍíËà»è„ÇÃäpìxÇÃÇ‡ÇÃÇíäèo
+//	for (size_t i = 0; i < lines.size(); i++) {
+//		double angle = atan(abs(lines[i][1] - lines[i][3]) / (abs(lines[i][0] - lines[i][2]) + 1e-10));
+//		if (lines[i][0] < 507 && lines[i][0]>5) { //í[Ç¡Ç±Ç≈ÉoÉOÇÈ
+//			if (angle > CV_PI / 2.0*params.angleThreshold) {
+//				float length = sqrt(pow((lines[i][0] - lines[i][2]), 2) + pow((lines[i][1] - lines[i][3]), 2));
+//				poles.push(PoleData(length, lines[i]));
+//			}
+//		}
+//	}
+//
+//	if (!poles.empty()) {
+//		//í∑Ç≥Ç™ç≈ëÂÇÃlineÇpoledataÇ…äiî[
+//		poledata = poles.top();
+//		//í∏ì_èÓïÒÇäiî[
+//		if (poledata.poledata[1] >= poledata.poledata[3]) { poledata.topPosition[0] = poledata.poledata[2]; poledata.topPosition[1] += poledata.poledata[3]; }
+//		else { poledata.topPosition[0] = poledata.poledata[0]; poledata.topPosition[1] += poledata.poledata[1]; }
+//	}
+//
+//};
 
 bool comp(cv::Vec4f& left, cv::Vec4f& right) {
 	return left[1] == right[1] ? left[3] > right[3] : left[1] > right[1];
@@ -136,36 +129,50 @@ auto merge_lines(std::vector<cv::Vec4f>& lines) {
 	while (lines.size() > 0) { //xï˚å¸Ç…ãﬂÇ¢íºê¸Ççáê¨
 		auto popped_line = lines.back(); lines.pop_back();
 		bool merged_flag = false;
-		for (auto &merged_line: mergedLines) {
+		for (auto &merged_line : mergedLines) {
 			auto popped_x = (popped_line[0] + popped_line[2]) / 2.0; auto merged_x = (merged_line[0] + merged_line[2]) / 2.0;
 
-			if (abs(popped_x - merged_x) < 15 && (merged_line[3]+20 > popped_line[1])) { 
+			if (abs(popped_x - merged_x) < 15 && (merged_line[3] + 20 > popped_line[1])) {
 				auto x0 = (merged_line[0] + popped_line[0]) / 2.0; auto x2 = (merged_line[2] + popped_line[2]) / 2.0;
-				merged_line[2] = x2;	
+				merged_line[2] = x2;
 				merged_line[3] = max(merged_line[3], popped_line[3]);
 				merged_flag = true;
 				break;
 			}
 		}
-		if(!merged_flag) mergedLines.push_back(popped_line); //äYìñÇµÇ»Ç¢ÇÃÇ≈í«â¡
+		if (!merged_flag) mergedLines.push_back(popped_line); //äYìñÇµÇ»Ç¢ÇÃÇ≈í«â¡
 	}
 
 	return mergedLines;
 }
 
-auto setPoleDatabyLSD(cv::Mat &img, int lengthThreshold, double angleThreshold) {
+void setPoleDatabyLSD(cv::Mat &img, PoleData& poledata, int lengthThreshold, double angleThreshold) {
 	using namespace cv;
 	using namespace std;
 	Mat dst;
-	cv::Canny(img, dst, 50, 200, 3, true);
+	int x_min, x_max, width;
+	if (!poledata.found_flag) {
+		cv::Canny(img, dst, 50, 200, 3, true);
+	}
+	else {//íTçıîÕàÕÇã∑ÇﬂÇÈ
+		x_min = max(0, min(poledata.poledata[0], poledata.poledata[2]) - 30);
+		x_max = min(img.cols, max(poledata.poledata[0], poledata.poledata[2]) + 30);
+		width = x_max - x_min;
+		auto rect = cv::Rect(x_min, 0, width, img.rows);
+		dst = img(rect);
+	}
+	imshow("dst", dst);
 	Ptr<LineSegmentDetector> ls = createLineSegmentDetector(LSD_REFINE_STD);
 	vector<Vec4f> lines;
 	ls->detect(dst, lines);
-	
+
 	vector<Vec4f> validLines;
 
 	//àÍíËà»è„ÇÃäpìx,í∑Ç≥ÇÃÇ‡ÇÃÇíäèo
 	for (size_t i = 0; i < lines.size(); i++) {
+		if (poledata.found_flag) { //îÕàÕÇã∑ÇﬂÇΩxç¿ïWÇå≥Ç…ñﬂÇ∑
+			lines[i][0] = lines[i][0] + x_min; lines[i][2] = lines[i][2] + x_min;
+		}
 		if (lines[i][1] > lines[i][3]) { //[1]<[3]Ç∆Ç∑ÇÈ
 			auto temp_x = lines[i][0]; lines[i][0] = lines[i][2]; lines[i][2] = temp_x;
 			auto temp_y = lines[i][1]; lines[i][1] = lines[i][3]; lines[i][3] = temp_y;
@@ -179,7 +186,7 @@ auto setPoleDatabyLSD(cv::Mat &img, int lengthThreshold, double angleThreshold) 
 		}
 	}
 
-	if (validLines.size()) {
+	if (validLines.size() > 0) {
 		sort(validLines.begin(), validLines.end(), comp); //yÇ™è¨Ç≥Ç¢Ç‡ÇÃÇ™å„ÇÎ
 		auto mergedLines = merge_lines(validLines);
 		//// Show found lines
@@ -190,17 +197,14 @@ auto setPoleDatabyLSD(cv::Mat &img, int lengthThreshold, double angleThreshold) 
 		auto max_length = 0.0;
 		Vec4f longest_line = mergedLines[0];
 		for (auto &merged_line : mergedLines) {
-			auto length_merged= sqrt(pow((merged_line[0] - merged_line[2]), 2) + pow((merged_line[1] - merged_line[3]), 2));
+			auto length_merged = sqrt(pow((merged_line[0] - merged_line[2]), 2) + pow((merged_line[1] - merged_line[3]), 2));
 			if (max_length < length_merged) {
-				max_length = length_merged; longest_line = merged_line; 
+				max_length = length_merged; longest_line = merged_line;
 			}
 		}
-		return PoleData(longest_line);
+		poledata.setpoledata(longest_line);
 	}
-
-	return PoleData();
 };
-
 
 void showPoleLine(cv::Mat &img, PoleData poledata) {
 	using namespace std;
@@ -208,9 +212,9 @@ void showPoleLine(cv::Mat &img, PoleData poledata) {
 	Mat color_dst;
 	string str_x;
 	cvtColor(img, color_dst, CV_GRAY2BGR);
-	if (poledata.length > 0) {
-		str_x = " x coordinates= " + to_string(poledata.poleLine[0]) + " pole Length: " + to_string(poledata.length);
-		line(color_dst, Point(poledata.poleLine[0], poledata.poleLine[1]), Point(poledata.poleLine[2], poledata.poleLine[3]), Scalar(0, 0, 255), 3, 8);
+	if (poledata.found_flag) {
+		str_x = " x coordinates= " + to_string(poledata.poledata[0]) + " pole Length: " + to_string(poledata.length);
+		line(color_dst, Point(poledata.poledata[0], poledata.poledata[1]), Point(poledata.poledata[2], poledata.poledata[3]), Scalar(0, 0, 255), 3, 8);
 	}
 	else str_x = "out of window";
 	putText(color_dst, str_x, Point(30, 60), FONT_HERSHEY_PLAIN, 1.0, Scalar(0, 255, 0));
@@ -248,3 +252,25 @@ void showPoleLine(cv::Mat &img, PoleData poledata) {
 	//		//imshow("centor",dst);
 	//	}
 	//}
+
+void find_shuttleLoc(PoleData& poledata, cv::Mat& img) {
+	cv::Mat color_ring;
+
+	float ringRad, trueLength;
+	poledata.ringtype == 'g' ? (ringRad = 400.0, trueLength = 3000.0) : (ringRad = 400.0, trueLength = 2000.0);
+	const int KERNELSIZE = 3;
+	const int FILTERTH = 150;
+	static cv::Mat kernel = cv::Mat::ones(KERNELSIZE, KERNELSIZE, CV_64F) / (double)(KERNELSIZE*KERNELSIZE);
+
+	if (poledata.found_flag) {
+		int sideLength = (int)(poledata.length*ringRad / trueLength) + 4;
+		int x = std::max(poledata.topPosition[0] - sideLength - 2, 0);
+		int y = std::max(poledata.topPosition[1] - sideLength * 2 - 2, 0);
+		poledata.ringROI = cv::Rect(x, y, sideLength * 2, sideLength * 2);
+		poledata.ringImage = img(poledata.ringROI);
+		cv::imshow("ringImage", poledata.ringImage);
+		cv::filter2D(poledata.ringImage, poledata.ringImage, -1, kernel);
+		cv::threshold(poledata.ringImage, poledata.ringImage, FILTERTH, 0, cv::THRESH_TOZERO);
+		cv::imshow("ringImage_filtered", poledata.ringImage);
+	}
+}
