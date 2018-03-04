@@ -5,6 +5,9 @@
 #include<iostream>
 #include<numeric>
 #include"PoleAndShuttlePrediction.h"
+#include"MySerial.h"
+
+#define COMPORT 5
 
 //動画の保存先
 std::time_t now = std::time(nullptr);
@@ -18,10 +21,12 @@ void adjustValues(std::string movieName_rgb, std::string movieName_depth);
 
 //基本的に取れていないデータには-1が入る
 int main() {
+	MySerial serial(COMPORT);
+
 	//saveRGBandDepthMovies(movieName_RGB,movieName_depth);
 	//test();
-	//LSDtestByKinect();
-	LSDtestByMovie();
+	LSDtestByKinect();
+	//LSDtestByMovie();
 	//adjustValues("./faultMovies/RGByellow.avi", "./faultMovies/depthyellow.avi");
 	return 0;
 }
@@ -63,14 +68,15 @@ void LSDtestByMovie() {
 		cv::imshow("depthImage", kinect.depthImage);
 
 		//画像処理パート
-		convedImage=convBinarizaionByHsv(kinect.hsvKeeper.hsvImage, kinect.depthImage); //convedImageを取得
-		cv::imshow("convedImage", convedImage);
-		
-		setPoleDatabyLSD(convedImage,poledata, 0, 0.90);
-		setPoleDepthbyMovie(poledata,kinect.depthImage,kinect.hsvKeeper.hsvImage);
+		convedImage = convBinarizaionByHsv(kinect.hsvKeeper.hsvImage, kinect.depthImage); //convedImageを取得
+
+		setPoleDatabyLSD(convedImage, poledata, 0, 0.90);
+		setPoleDepthbyMovie(poledata, kinect.depthImage, kinect.hsvKeeper.hsvImage);
 		showPoleLine(kinect.depthImage, poledata);
 		find_shuttleLoc(poledata, kinect.depthImage);
 
+		poledata.setpole_angle();
+		if (poledata.found_angle_flag) cout << poledata.pole_angle << endl;
 		auto key = cv::waitKey(1);
 		if (key == 'q') break;
 		else if (key == 's') cv::waitKey(0);
@@ -78,42 +84,40 @@ void LSDtestByMovie() {
 	}
 }
 
-//void LSDtestByKinect() {
-//	using namespace std;
-//	vector<PoleData> poledatas;
-//	//savemovie(moviename_rgb,moviename_depth);
-//	MyKinectV2 kinect;
-//	kinect.initializeColor();
-//	kinect.initializeDepth();
-//	kinect.initializeMulti();
-//	cv::Mat convedImage;
-//	kinect.hsvKeeper.initHSVvalues("hsvValues_red.xml");
-//	while (1) {
-//		kinect.setDepthandMappedRGB();
-//		cv::imshow("RGB", kinect.RGBImage);
-//		kinect.hsvKeeper.setHSVvalues();
-//		kinect.hsvKeeper.setHSVImage(kinect.RGBImage);
-//		kinect.hsvKeeper.extractColor();
-//		//cv::imshow("HSVImage", kinect.hsvKeeper.hsvImage);
-//		cv::imshow("depthImage", kinect.depthImage);
-//		convedImage = convBinarizaionByHsv(kinect.hsvKeeper.hsvImage, kinect.depthImage); //convedImageを取得
-//		auto tempdata = setPoleDatabyLSD(convedImage, 0, 0.90);
-//		
-//		//poledataの平均を算出
-//		if (tempdata.length > 0) {
-//			poledatas.push_back(tempdata);
-//			if (poledatas.size() > 3) poledatas.erase(poledatas.begin());
-//		}
-//		auto poledata = std::accumulate(poledatas.begin(), poledatas.end(), PoleData(cv::Vec4f(0.0, 0.0, 0.0, 0.0))) / (float)poledatas.size();
-//		//setPoleDepthbyKinect(poledata, kinect.depthBuffer, kinect.hsvKeeper.hsvImage);
-//		setPoleDepthbyMovie(poledata, kinect.depthImage, kinect.hsvKeeper.hsvImage);
-//		showPoleLine(kinect.depthImage, poledata);
-//
-//		auto key = cv::waitKey(1);
-//		if (key == 'q') break;
-//		else if (key == 's') cv::waitKey(0);
-//	}
-//}
+void LSDtestByKinect() {
+	using namespace std;
+	PoleData poledata;
+	MyKinectV2 kinect;
+	kinect.initializeColor();
+	kinect.initializeDepth();
+	kinect.initializeMulti();
+	cv::Mat convedImage;
+	kinect.hsvKeeper.initHSVvalues("hsvValues_red.xml");
+	int countFrame = 0;
+	while (1) {
+		kinect.setDepthandMappedRGB();
+		/*kinect.setMappedRGB();
+		kinect.setDepth();*/
+		cv::imshow("RGB", kinect.RGBImage);
+		kinect.hsvKeeper.setHSVvalues();
+		kinect.hsvKeeper.setHSVImage(kinect.RGBImage);
+		kinect.hsvKeeper.extractColor();
+		cv::imshow("depthImage", kinect.depthImage);
+		convedImage = convBinarizaionByHsv(kinect.hsvKeeper.hsvImage, kinect.depthImage); //convedImageを取得
+
+		setPoleDatabyLSD(convedImage, poledata, 0, 0.90);
+		setPoleDepthbyMovie(poledata, kinect.depthImage, kinect.hsvKeeper.hsvImage);
+		showPoleLine(kinect.depthImage, poledata);
+		find_shuttleLoc(poledata, kinect.depthImage);
+		poledata.setpole_angle();
+
+		auto key = cv::waitKey(1);
+		if (key == 'q') break;
+		else if (key == 's') cv::waitKey(0);
+		countFrame++;
+
+	}
+}
 
 void adjustValues(std::string movieName_RGB, std::string movieName_depth) {
 
@@ -124,9 +128,9 @@ void adjustValues(std::string movieName_RGB, std::string movieName_depth) {
 	char color_flag;
 	std::cin >> color_flag;
 	std::string hsvfile_name;
-	switch(color_flag) {
+	switch (color_flag) {
 	case 'r':
-		hsvfile_name = "hsvValues_red.xml"; 
+		hsvfile_name = "hsvValues_red.xml";
 		break;
 	case 'b':
 		hsvfile_name = "hsvValues_blue.xml";

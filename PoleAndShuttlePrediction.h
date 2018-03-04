@@ -20,7 +20,9 @@ public:
 	char ringtype;
 	float length;
 	bool found_flag = false;
+	bool found_angle_flag = false;
 	int poleDepth;
+	float pole_angle;
 
 	cv::Vec4i poledata;
 	cv::Vec4f poledata_f;
@@ -37,15 +39,27 @@ public:
 		this->found_flag = true;
 		this->length = sqrt(pow((line[0] - line[2]), 2) + pow((line[1] - line[3]), 2));
 		this->poledata_f = line;
+
+		//poledata_stackにデータを貯めていく
+		poledata_stack.push_back(poledata_f);
+		if (poledata_stack.size() > stack_capa) poledata_stack.erase(poledata_stack.begin());
+		poledata_f = std::accumulate(poledata_stack.begin(), poledata_stack.end(), cv::Vec4f::all(0.0)) / (float)poledata_stack.size();
 		for (int i = 0; i < 4; i++) {
 			poledata[i] = (int)poledata_f[i];
 		}
-		if (line[3] > line[1]) { this->topPosition[0] = (int)line[0]; this->topPosition[1] = (int)line[1]; }
-		else { this->topPosition[0] = (int)line[2]; this->topPosition[1] = (int)line[3]; }
-		//poledata_stackにデータを貯めていく
-		poledata_stack.push_back(poledata);
-		if (poledata_stack.size() > stack_capa) poledata_stack.erase(poledata_stack.begin());
-		poledata = std::accumulate(poledata_stack.begin(), poledata_stack.end(), cv::Vec4f::all(0.0)) / (float)poledata_stack.size();
+
+		//topPosition
+		if (poledata[3] > poledata[1]) { this->topPosition[0] = (int)poledata[0]; this->topPosition[1] = (int)poledata[1]; }
+		else { this->topPosition[0] = (int)poledata[2]; this->topPosition[1] = (int)poledata[3]; }
+	}
+
+	void setpole_angle() {
+		if (found_flag && poleDepth != 0) {
+			float x_pxl = ((poledata_f[0] + poledata_f[2]) / 2.0) - 256.0;
+			std::cout << x_pxl << std::endl;
+			pole_angle = 70.0*(x_pxl / 256.0);
+			found_angle_flag = true;
+		}
 	}
 
 	PoleData() {
@@ -161,7 +175,6 @@ void setPoleDatabyLSD(cv::Mat &img, PoleData& poledata, int lengthThreshold, dou
 		auto rect = cv::Rect(x_min, 0, width, img.rows);
 		dst = img(rect);
 	}
-	imshow("dst", dst);
 	Ptr<LineSegmentDetector> ls = createLineSegmentDetector(LSD_REFINE_STD);
 	vector<Vec4f> lines;
 	ls->detect(dst, lines);
