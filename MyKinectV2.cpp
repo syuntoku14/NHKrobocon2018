@@ -16,7 +16,6 @@ MyKinectV2::~MyKinectV2()
 	}
 }
 
-#pragma region get_image
 
 template <class Interface> inline void safe_release(Interface **ppT)
 {
@@ -138,6 +137,7 @@ void MyKinectV2::setRGB() {
 }
 
 void MyKinectV2::setMappedRGB() {
+
 	//updateColorFrame();
 	//updateMultiFrame();
 	// Retrieve Mapped Coordinates
@@ -164,6 +164,32 @@ void MyKinectV2::setMappedRGB() {
 
 	RGBImage = cv::Mat(depthHeight, depthWidth, CV_8UC4, &buffer[0]).clone();
 }
+
+void MyKinectV2::setMappedDepth() {
+	// Retrieve Mapped Coordinates
+	std::vector<DepthSpacePoint> depthSpacePoints(colorWidth * colorHeight);
+	ERROR_CHECK(coordinateMapper->MapColorFrameToDepthSpace(depthBuffer.size(), &depthBuffer[0], depthSpacePoints.size(), &depthSpacePoints[0]));
+
+	// Mapped Depth Buffer
+	std::vector<UINT16> buffer(colorWidth * colorHeight);
+
+	// Mapping Depth Data to Color Resolution
+	for (int colorY = 0; colorY < colorHeight; colorY++) {
+		for (int colorX = 0; colorX < colorWidth; colorX++) {
+			const unsigned int colorIndex = colorY * colorWidth + colorX;
+			const int depthX = static_cast<int>(depthSpacePoints[colorIndex].X + 0.5f);
+			const int depthY = static_cast<int>(depthSpacePoints[colorIndex].Y + 0.5f);
+			if ((0 <= depthX) && (depthX < depthWidth) && (0 <= depthY) && (depthY < depthHeight)) {
+				const unsigned int depthIndex = depthY * depthWidth + depthX;
+				buffer[colorIndex] = (UINT16)((depthBuffer[depthIndex]/8000.0)*250.0);
+			}
+		}
+	}
+	depthImage = cv::Mat(colorHeight, colorWidth, CV_8UC1,&buffer[0]).clone();
+
+}
+
+
 void MyKinectV2::setDepthandMappedRGB() {
 	updateMultiFrame();
 
@@ -196,6 +222,29 @@ void MyKinectV2::setDepthandMappedRGB() {
 	RGBImage = cv::Mat(depthHeight, depthWidth, CV_8UC4, &buffer[0]).clone();
 }
 
+void MyKinectV2::setMappedDepthandRGB() {
+	updateMultiFrame();
+
+	RGBImage = cv::Mat(colorHeight, colorWidth, CV_8UC4, &colorBuffer[0]);
+	depthImage = cv::Mat(colorHeight, colorWidth, CV_8UC1);
+
+	std::vector<DepthSpacePoint> depthSpacePoints(colorWidth * colorHeight);
+	ERROR_CHECK(coordinateMapper->MapColorFrameToDepthSpace(depthBuffer.size(), &depthBuffer[0], depthSpacePoints.size(), &depthSpacePoints[0]));
+
+	// Mapped Depth Buffer
+	std::vector<UINT16> buffer(colorWidth * colorHeight);
+
+	for (int i = 0; i < colorWidth*colorHeight; ++i) {
+		int depthX = (int)depthSpacePoints[i].X;
+		int depthY = (int)depthSpacePoints[i].Y;
+		if ((depthX < 0) || (depthWidth <= depthX) || (depthY < 0) || (depthHeight <= depthY)) {
+			continue;
+		}
+	
+	int depthIndex = (depthY*depthWidth) + depthX;
+	depthImage.data[i] = (UINT16)((depthBuffer[depthIndex]/8000.0)*250.0);
+	}
+}
 bool MyKinectV2::setRGBbyMovie(std::string movieName) {
 	static cv::VideoCapture cap(movieName);
 	cv::Mat temp;
@@ -232,7 +281,6 @@ void MyKinectV2::initializeDepth() {
 	std::cout << "Depth最大値       : " << maxDepthReliableDistance << std::endl;
 	std::cout << "depthWidth: " << depthWidth << std::endl;
 	std::cout << "depthHeight: " << depthHeight << std::endl;
-#pragma endregion
 
 	// バッファーを作成する
 	depthBuffer.resize(depthWidth * depthHeight);
@@ -272,7 +320,6 @@ bool MyKinectV2::setDepthbyMovie(std::string movieName) {
 	cv::cvtColor(temp, depthImage, CV_RGB2GRAY);
 	return true;
 }
-#pragma endregion
 
 void MyKinectV2::showDistance() {
 	int index = (depthPointY * depthWidth) + depthPointX;

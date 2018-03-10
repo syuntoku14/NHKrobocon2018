@@ -87,6 +87,7 @@ public:
 	HSVkeeper hsvKeeper;
 
 	std::vector<UINT16> depthBuffer;
+	cv::Mat depthData_Mat;
 	int depthWidth, depthHeight; //512 424
 	cv::Mat depthImage;
 	//ê[ìxÇÃîÕàÕ
@@ -106,9 +107,11 @@ public:
 	virtual void initializeDepth();
 	void updateDepthFrame();
 	void setDepth();
+	void setMappedDepth();
 	bool setDepthbyMovie(std::string movieName);
 	void showDistance();
 
 	void setDepthandMappedRGB();
+	void setMappedDepthandRGB();
 #pragma endregion
 };

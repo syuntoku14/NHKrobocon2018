@@ -22,14 +22,14 @@ public:
 	bool found_flag = false;
 	bool found_angle_flag = false;
 	int poleDepth;
-	float pole_angle;
+	char pole_angle;
 
 	cv::Vec4i poledata;
 	cv::Vec4f poledata_f;
 	std::vector<cv::Vec4f> poledata_stack;
 	cv::Vec2i topPosition; //(x,y)
 	std::vector<cv::Vec2i> topPosition_stack;
-	const int stack_capa = 3;
+	const int stack_capa = 2;
 
 	cv::Rect ringROI;
 	cv::Mat ringImage;
@@ -37,27 +37,29 @@ public:
 
 	void setpoledata(cv::Vec4f line) {
 		this->found_flag = true;
-		this->length = sqrt(pow((line[0] - line[2]), 2) + pow((line[1] - line[3]), 2));
 		this->poledata_f = line;
+		float temp_length = sqrt(pow((line[0] - line[2]), 2) + pow((line[1] - line[3]), 2));
 
 		//poledata_stack‚Éƒf[ƒ^‚ð’™‚ß‚Ä‚¢‚­
-		poledata_stack.push_back(poledata_f);
-		if (poledata_stack.size() > stack_capa) poledata_stack.erase(poledata_stack.begin());
-		poledata_f = std::accumulate(poledata_stack.begin(), poledata_stack.end(), cv::Vec4f::all(0.0)) / (float)poledata_stack.size();
-		for (int i = 0; i < 4; i++) {
-			poledata[i] = (int)poledata_f[i];
+		if (temp_length > this->length - 30) {
+			poledata_stack.push_back(poledata_f);
+			if (poledata_stack.size() > stack_capa) poledata_stack.erase(poledata_stack.begin());
+			poledata_f = std::accumulate(poledata_stack.begin(), poledata_stack.end(), cv::Vec4f::all(0.0)) / (float)poledata_stack.size();
+			for (int i = 0; i < 4; i++) {
+				poledata[i] = (int)poledata_f[i];
+			}
+			this->length = sqrt(pow((poledata[0] - poledata[2]), 2) + pow((poledata[1] - poledata[3]), 2));
+			//topPosition
+			if (poledata[3] > poledata[1]) { this->topPosition[0] = (int)poledata[0]; this->topPosition[1] = (int)poledata[1]; }
+			else { this->topPosition[0] = (int)poledata[2]; this->topPosition[1] = (int)poledata[3]; }
 		}
-
-		//topPosition
-		if (poledata[3] > poledata[1]) { this->topPosition[0] = (int)poledata[0]; this->topPosition[1] = (int)poledata[1]; }
-		else { this->topPosition[0] = (int)poledata[2]; this->topPosition[1] = (int)poledata[3]; }
 	}
 
 	void setpole_angle() {
 		if (found_flag && poleDepth != 0) {
 			float x_pxl = ((poledata_f[0] + poledata_f[2]) / 2.0) - 256.0;
 			std::cout << x_pxl << std::endl;
-			pole_angle = 70.0*(x_pxl / 256.0);
+			pole_angle = (char)(70.0*(x_pxl / 256.0));
 			found_angle_flag = true;
 		}
 	}
@@ -169,8 +171,8 @@ void setPoleDatabyLSD(cv::Mat &img, PoleData& poledata, int lengthThreshold, dou
 		cv::Canny(img, dst, 50, 200, 3, true);
 	}
 	else {//’Tõ”ÍˆÍ‚ð‹·‚ß‚é
-		x_min = max(0, min(poledata.poledata[0], poledata.poledata[2]) - 30);
-		x_max = min(img.cols, max(poledata.poledata[0], poledata.poledata[2]) + 30);
+		x_min = max(0, min(poledata.poledata[0], poledata.poledata[2]) - 50);
+		x_max = min(img.cols, max(poledata.poledata[0], poledata.poledata[2]) + 50);
 		width = x_max - x_min;
 		auto rect = cv::Rect(x_min, 0, width, img.rows);
 		dst = img(rect);
@@ -215,7 +217,9 @@ void setPoleDatabyLSD(cv::Mat &img, PoleData& poledata, int lengthThreshold, dou
 				max_length = length_merged; longest_line = merged_line;
 			}
 		}
-		poledata.setpoledata(longest_line);
+		if (poledata.length - 30 < max_length) {
+			poledata.setpoledata(longest_line);
+		}
 	}
 };
 
@@ -234,6 +238,21 @@ void showPoleLine(cv::Mat &img, PoleData poledata) {
 	imshow("Detected Lines", color_dst);
 }
 
+void showPoleLine_when_Kinect(cv::Mat &img, PoleData poledata) {
+	using namespace std;
+	using namespace cv;
+	Mat color_dst;
+	string str_x;
+	cvtColor(img, color_dst, CV_GRAY2BGR);
+	if (poledata.found_flag) {
+		str_x = " x coordinates= " + to_string(poledata.poledata[0]) + " pole Length: " + to_string(poledata.length);
+		line(color_dst, Point(poledata.poledata[0], poledata.poledata[1]), Point(poledata.poledata[2], poledata.poledata[3]), Scalar(0, 0, 255), 3, 8);
+	}
+	else str_x = "out of window";
+	putText(color_dst, str_x, Point(30, 60), FONT_HERSHEY_PLAIN, 1.0, Scalar(0, 255, 0));
+	resize(color_dst, color_dst, Size(), 0.4, 0.4);
+	imshow("Detected Lines", color_dst);
+}
 //auto findShuttleCoordinate_byTracking(cv::Mat HSVImage, ShuttleData &shuttledata) {
 	//	using namespace cv;
 	//	using namespace std;

@@ -14,13 +14,14 @@ private:
 	int Status;
 
 public:
-	MySerial(int COMnum);
+	MySerial(int COMnum, bool timeout_flag);
 
 	void sendData(unsigned char data);
 	void sendData(int data);
 	void recieveData(char SerialBuffer[]);
-
-	~MySerial();
+	~MySerial() {
+		CloseHandle(hComm);
+	}
 };
 
 #endif

@@ -1,5 +1,5 @@
 #include"MySerial.h"
-MySerial::MySerial(int COMnum) {
+MySerial::MySerial(int COMnum, bool timeout_flag) {
 	using namespace std;
 //open COMport
 	string port_name = "COM" + to_string(COMnum);
@@ -23,12 +23,14 @@ MySerial::MySerial(int COMnum) {
 	SetCommState(hComm, &dcbSerialParams);
 
 //setting timeouts
-	COMMTIMEOUTS timeouts = { 0 };
-	timeouts.ReadIntervalTimeout = 50;
-	timeouts.ReadTotalTimeoutConstant = 50;
-	timeouts.ReadTotalTimeoutMultiplier = 10;
-	timeouts.WriteTotalTimeoutConstant = 50;
-	timeouts.WriteTotalTimeoutMultiplier = 10;
+	if (timeout_flag) {
+		timeouts = { 0 };
+		timeouts.ReadTotalTimeoutConstant = 1000;
+		timeouts.ReadTotalTimeoutMultiplier = 50;
+		timeouts.WriteTotalTimeoutConstant = 1000;
+		timeouts.WriteTotalTimeoutMultiplier = 50;
+		SetCommTimeouts(hComm, &timeouts);
+	}
 }
 
 void MySerial::sendData(unsigned char data) {
@@ -62,6 +64,8 @@ void MySerial::sendData(int data) {
 	cout << dNoOfBytesWritten << endl;
 }
 void MySerial::recieveData(char SerialBuffer[]) {
+	GetCommTimeouts(hComm, &timeouts);
+
 	//setting WaiComm Event
 	Status = SetCommMask(hComm, EV_RXCHAR); //Configure Windows to Monitor the serial device for Character Reception
 	if (Status == FALSE) printf("\n\n    Error! in Setting CommMask");
@@ -85,9 +89,9 @@ void MySerial::recieveData(char SerialBuffer[]) {
 			NULL);
 		SerialBuffer[i] = TempChar;// Store Tempchar into buffer
 		i++;
+		std::cout << NoBytesRead <<TempChar<< std::endl;
+		NoBytesRead--;
 	} while (NoBytesRead > 0);
+
 }
 
-MySerial::~MySerial() {
-	CloseHandle(hComm);
-}
