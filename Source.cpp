@@ -7,7 +7,7 @@
 #include"PoleAndShuttlePrediction.h"
 #include"MySerial.h"
 
-#define COMPORT 4 
+#define COMPORT 6 
 
 //動画の保存先
 std::time_t now = std::time(nullptr);
@@ -26,14 +26,14 @@ MySerial serial(COMPORT, false);
 int main() {
 	using namespace std;
 	char ringtype[1];
-	serial.recieveData(ringtype);
-	cout << ringtype[0] << endl;
-	serial.sendData('c');
+	//serial.recieveData(ringtype);
+	//cout << ringtype[0] << endl;
+	//serial.sendData('c');
 
-	//saveRGBandDepthMovies(movieName_RGB,movieName_depth);
+	//saveRGBandMappedDepthMovies(movieName_RGB,movieName_depth);
 	//test();
-	//LSDtestByKinect(ringtype[0]);
-	LSDtestByMovie(ringtype[0]);
+	LSDtestByKinect(ringtype[0]);
+	//LSDtestByMovie(ringtype[0]);
 	//adjustValues("./faultMovies/RGByellow.avi", "./faultMovies/depthyellow.avi");
 	return 0;
 }
@@ -66,11 +66,16 @@ void LSDtestByMovie(char ringtype) {
 	MyKinectV2 kinect;
 	kinect.initializeColor();
 	kinect.initializeDepth();
-	cv::Mat convedImage;
+	cv::Mat convedImage, convedRing;
 	kinect.hsvKeeper.initHSVvalues("hsvValues_red.xml");
+	HSVkeeper ringHSV;
+	ringHSV.initHSVvalues("hsvValues_blue.xml");
+
 	while (1) {
-		if (!kinect.setRGBbyMovie("./faultMovies/RGB1.avi")) break;
-		kinect.setDepthbyMovie("./faultMovies/depth1.avi");
+		if (!kinect.setRGBbyMovie("./shuttleMovies/rgb_test.avi")) break;
+		kinect.setDepthbyMovie("./shuttleMovies/depth_test.avi");
+		cv::resize(kinect.RGBImage, kinect.RGBImage, cv::Size(512, 424));
+		cv::resize(kinect.depthImage, kinect.depthImage, cv::Size(512, 424));
 		cv::imshow("RGB", kinect.RGBImage);
 		kinect.hsvKeeper.setHSVvalues();
 		kinect.hsvKeeper.setHSVImage(kinect.RGBImage);
@@ -79,12 +84,18 @@ void LSDtestByMovie(char ringtype) {
 		cv::imshow("depthImage", kinect.depthImage);
 
 		//画像処理パート
-		convedImage = convBinarizaionByHsv(kinect.hsvKeeper.hsvImage, kinect.depthImage); //convedImageを取得
-
+		convedImage = convBinarizaionByHsv(kinect.hsvKeeper.hsvImage, kinect.depthImage); //対応する色の部分だけ深度を表示したもの
+		//直線検出
 		setPoleDatabyLSD(convedImage, poledata, 0, 0.90);
-		setPoleDepthbyMovie(poledata, kinect.depthImage, kinect.hsvKeeper.hsvImage);
+		setPoleDepth(poledata, kinect.depthImage, kinect.hsvKeeper.hsvImage); //ポールの深度を格納
 		showPoleLine(kinect.depthImage, poledata);
-		find_shuttleLoc(poledata, kinect.depthImage);
+
+		ringHSV.setHSVvalues();
+		ringHSV.setHSVImage(kinect.RGBImage);
+		ringHSV.extractColor();
+		convedRing = convBinarizaionByHsv(kinect.depthImage, ringHSV.hsvImage); //青色付近だけ抽出したもの
+
+		find_shuttleLoc(poledata, convedRing);
 
 		poledata.setpole_angle();
 		if (poledata.found_angle_flag) {
@@ -107,24 +118,29 @@ void LSDtestByKinect(char ringtype) {
 	kinect.initializeColor();
 	kinect.initializeDepth();
 	kinect.initializeMulti();
-	cv::Mat convedImage;
+	cv::Mat convedImage, convedRing;
 	kinect.hsvKeeper.initHSVvalues("hsvValues_red.xml");
-	cv::Mat rgb, depth;
+	HSVkeeper ringHSV;
+	ringHSV.initHSVvalues("hsvValues_blue.xml");
+
 	while (1) {
 		kinect.setMappedDepthandRGB();
-		cv::resize(kinect.RGBImage, rgb, cv::Size(), 0.4, 0.4);
-		cv::imshow("RGB", rgb);
+		cv::resize(kinect.RGBImage, kinect.RGBImage, cv::Size(512, 424));
+		cv::resize(kinect.depthImage, kinect.depthImage, cv::Size(512, 424));
 		kinect.hsvKeeper.setHSVvalues();
 		kinect.hsvKeeper.setHSVImage(kinect.RGBImage);
 		kinect.hsvKeeper.extractColor();
-		cv::resize(kinect.depthImage, depth, cv::Size(), 0.4, 0.4);
-		cv::imshow("depthImage", depth);
-		convedImage = convBinarizaionByHsv(kinect.hsvKeeper.hsvImage, kinect.depthImage); //convedImageを取得
+		convedImage = convBinarizaionByHsv(kinect.hsvKeeper.hsvImage, kinect.depthImage); //赤色付近だけ抽出したもの
+		ringHSV.setHSVvalues();
+		ringHSV.setHSVImage(kinect.RGBImage);
+		ringHSV.extractColor();
+		convedRing = convBinarizaionByHsv(kinect.depthImage, ringHSV.hsvImage); //青色付近だけ抽出したもの
 
 		setPoleDatabyLSD(convedImage, poledata, 0, 0.90);
-		setPoleDepthbyMovie(poledata, kinect.depthImage, kinect.hsvKeeper.hsvImage);
-		showPoleLine_when_Kinect(kinect.depthImage, poledata);
-		find_shuttleLoc(poledata, kinect.depthImage);
+		setPoleDepth(poledata, kinect.depthImage, kinect.hsvKeeper.hsvImage);
+		showPoleLine(kinect.depthImage, poledata);
+
+		find_shuttleLoc(poledata, convedRing);
 		poledata.setpole_angle();
 		if (poledata.found_angle_flag) {
 			cout << (int)poledata.pole_angle << endl;

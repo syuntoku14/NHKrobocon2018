@@ -16,7 +16,7 @@ private:
 public:
 	MySerial(int COMnum, bool timeout_flag);
 
-	void sendData(unsigned char data);
+	void sendData(char data);
 	void sendData(int data);
 	void recieveData(char SerialBuffer[]);
 	~MySerial() {

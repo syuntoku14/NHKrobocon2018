@@ -68,3 +68,37 @@ void saveRGBandDepthMovies(std::string movieName_rgb, std::string movieName_dept
 		std::cout << ex.what() << std::endl;
 	}
 };
+
+void saveRGBandMappedDepthMovies(std::string movieName_rgb, std::string movieName_depth) {
+	try {
+		MyKinectV2 kinect;
+
+		kinect.initializeColor();
+		kinect.initializeDepth();
+		kinect.initializeMulti();
+		static cv::VideoWriter rgbWriter(movieName_rgb, cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(kinect.colorWidth, kinect.colorHeight), true);
+		static cv::VideoWriter depthWriter(movieName_depth, cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(kinect.colorWidth, kinect.colorHeight), false);
+
+		while (1) {
+			kinect.setMappedDepthandRGB();
+			cv::Mat img,depth,rgb;
+			cv::cvtColor(kinect.RGBImage, img, CV_BGRA2BGR);
+			depthWriter << kinect.depthImage;
+			rgbWriter << img;
+
+			cv::resize(kinect.depthImage, depth, cv::Size(), 0.4, 0.4);
+			cv::resize(kinect.RGBImage, rgb, cv::Size(), 0.4, 0.4);
+			cv::imshow("depthImage", depth);
+			cv::imshow("RGBImage", rgb);
+
+			auto key = cv::waitKey(1);
+			if (key == 'q') {
+				break;
+			}
+		}
+	}
+	catch (std::exception& ex) {
+		std::cout << ex.what() << std::endl;
+	}
+};
+

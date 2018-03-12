@@ -14,6 +14,35 @@
         throw std::runtime_error( ss.str().c_str() );			\
     } \
 
+class HSVkeeper {
+public:
+	cv::Scalar hsv_min;
+	cv::Scalar hsv_max;
+	cv::Mat hsvImage;
+
+	int min_h, min_s, min_v;
+	int max_h, max_s, max_v;
+	cv::FileStorage fs;
+
+	void initHSVvalues(std::string filename) {
+		fs.open(filename, cv::FileStorage::READ);
+		fs["min_h"] >> min_h; fs["min_s"] >> min_s; fs["min_v"] >> min_v;
+		fs["max_h"] >> max_h; fs["max_s"] >> max_s; fs["max_v"] >> max_v;
+		fs.release();
+	};
+
+	void setHSVvalues() {
+		hsv_min = cv::Scalar(min_h, min_s, min_v);
+		hsv_max = cv::Scalar(max_h, max_s, max_v);
+	};
+
+	void setHSVImage(cv::Mat &img) { cv::cvtColor(img, hsvImage, CV_RGB2HSV); };
+	void extractColor() {
+		inRange(hsvImage, hsv_min, hsv_max, hsvImage);
+		cv::medianBlur(hsvImage, hsvImage, 3);
+	};
+};
+
 // class to get data from Kinect v2
 class MyKinectV2
 {
@@ -42,47 +71,10 @@ public:
 			depthPointY = y;
 		}
 	};
-#pragma endregion
 
-#pragma region variables
 	std::vector<BYTE> colorBuffer;
 	int colorWidth, colorHeight;
 	cv::Mat RGBImage;
-
-	class HSVkeeper {
-	public:
-#pragma region variables
-		cv::Scalar hsv_min;
-		cv::Scalar hsv_max;
-		cv::Mat hsvImage;
-#pragma endregion
-
-#pragma region donttouch
-		int min_h, min_s, min_v;
-		int max_h, max_s, max_v;
-		cv::FileStorage fs;
-#pragma endregion
-#pragma region functions
-
-		void initHSVvalues(std::string filename) {
-			fs.open(filename, cv::FileStorage::READ);
-			fs["min_h"] >> min_h; fs["min_s"] >> min_s; fs["min_v"] >> min_v;
-			fs["max_h"] >> max_h; fs["max_s"] >> max_s; fs["max_v"] >> max_v;
-			fs.release();
-		};
-
-		void setHSVvalues() {
-			hsv_min = cv::Scalar(min_h, min_s, min_v);
-			hsv_max = cv::Scalar(max_h, max_s, max_v);
-		};
-
-		void setHSVImage(cv::Mat &img) { cv::cvtColor(img, hsvImage, CV_RGB2HSV); };
-		void extractColor() {
-			inRange(hsvImage, hsv_min, hsv_max, hsvImage);
-			cv::medianBlur(hsvImage, hsvImage, 3);
-		};
-#pragma endregion
-	};
 
 	HSVkeeper hsvKeeper;
 

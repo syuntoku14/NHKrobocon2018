@@ -25,11 +25,14 @@ public:
 	char pole_angle;
 
 	cv::Vec4i poledata;
-	cv::Vec4f poledata_f;
+	cv::Vec4f poledata_f; //[1]<[3]
 	std::vector<cv::Vec4f> poledata_stack;
+	cv::Vec2f poleY; //[0]<[1]
+	std::vector<cv::Vec2f> poleY_stack; 
 	cv::Vec2i topPosition; //(x,y)
 	std::vector<cv::Vec2i> topPosition_stack;
-	const int stack_capa = 2;
+	const int poledata_stack_capa = 3;
+	const int poleY_stack_capa = 30;
 
 	cv::Rect ringROI;
 	cv::Mat ringImage;
@@ -40,14 +43,24 @@ public:
 		this->poledata_f = line;
 		float temp_length = sqrt(pow((line[0] - line[2]), 2) + pow((line[1] - line[3]), 2));
 
-		//poledata_stackにデータを貯めていく
-		if (temp_length > this->length - 30) {
+		if (this->length - 30 < temp_length) {
+			//poleY_stackにデータをため、y座標の平均値を算出する
+			cv::Vec2f temp_poleY;
+			temp_poleY[0] = line[1]; temp_poleY[1] = line[3];
+			poleY_stack.push_back(temp_poleY);
+			if (poleY_stack.size() > poleY_stack_capa) poleY_stack.erase(poleY_stack.begin());
+			poleY = std::accumulate(poleY_stack.begin(), poleY_stack.end(), cv::Vec2f::all(0.0)) / (float)poleY_stack.size();
+
+			//poledata_stackにデータを貯めていく
+			//これはポールの座標全部蓄えているが、y座標は安定した場合ほとんど普遍なので、その辺を考慮したほうがいいかも
 			poledata_stack.push_back(poledata_f);
-			if (poledata_stack.size() > stack_capa) poledata_stack.erase(poledata_stack.begin());
+			if (poledata_stack.size() > poledata_stack_capa) poledata_stack.erase(poledata_stack.begin());
 			poledata_f = std::accumulate(poledata_stack.begin(), poledata_stack.end(), cv::Vec4f::all(0.0)) / (float)poledata_stack.size();
 			for (int i = 0; i < 4; i++) {
 				poledata[i] = (int)poledata_f[i];
 			}
+			poledata[1] = poleY[0]; poledata[3] = poleY[1]; //poleのy座標を平均値で修正
+
 			this->length = sqrt(pow((poledata[0] - poledata[2]), 2) + pow((poledata[1] - poledata[3]), 2));
 			//topPosition
 			if (poledata[3] > poledata[1]) { this->topPosition[0] = (int)poledata[0]; this->topPosition[1] = (int)poledata[1]; }
@@ -58,7 +71,6 @@ public:
 	void setpole_angle() {
 		if (found_flag && poleDepth != 0) {
 			float x_pxl = ((poledata_f[0] + poledata_f[2]) / 2.0) - 256.0;
-			std::cout << x_pxl << std::endl;
 			pole_angle = (char)(70.0*(x_pxl / 256.0));
 			found_angle_flag = true;
 		}
@@ -86,7 +98,7 @@ void setPoleDepthbyKinect(PoleData &poledata, const std::vector<UINT16> &depthBu
 	std::cout << "poleDepth: " << poledata.poleDepth << endl;
 };
 
-void setPoleDepthbyMovie(PoleData &poledata, const cv::Mat depthImage, const cv::Mat HSVImage) {
+void setPoleDepth(PoleData &poledata, const cv::Mat depthImage, const cv::Mat HSVImage) {
 	auto x = (int)((poledata.poledata[0] + poledata.poledata[2]) / 2);
 	auto y = (int)((poledata.poledata[1] + poledata.poledata[3]) / 2);
 	if (poledata.found_flag) {
@@ -166,8 +178,11 @@ void setPoleDatabyLSD(cv::Mat &img, PoleData& poledata, int lengthThreshold, dou
 	using namespace cv;
 	using namespace std;
 	Mat dst;
-	int x_min, x_max, width;
-	if (!poledata.found_flag) {
+	int x_min = 0; 
+	int x_max = img.cols; 
+	int width;
+	static int count = 0;
+	if (!poledata.found_flag || count % 10 == 0) {
 		cv::Canny(img, dst, 50, 200, 3, true);
 	}
 	else {//探索範囲を狭める
@@ -177,6 +192,7 @@ void setPoleDatabyLSD(cv::Mat &img, PoleData& poledata, int lengthThreshold, dou
 		auto rect = cv::Rect(x_min, 0, width, img.rows);
 		dst = img(rect);
 	}
+	count++;
 	Ptr<LineSegmentDetector> ls = createLineSegmentDetector(LSD_REFINE_STD);
 	vector<Vec4f> lines;
 	ls->detect(dst, lines);

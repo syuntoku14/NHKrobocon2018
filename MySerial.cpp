@@ -16,7 +16,7 @@ MySerial::MySerial(int COMnum, bool timeout_flag) {
 	dcbSerialParams = { 0 };
 	dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
 	Status = GetCommState(hComm, &dcbSerialParams);
-	dcbSerialParams.BaudRate = CBR_9600;
+	dcbSerialParams.BaudRate = CBR_115200;
 	dcbSerialParams.ByteSize = 8;
 	dcbSerialParams.StopBits = ONESTOPBIT;
 	dcbSerialParams.Parity = NOPARITY;
@@ -33,10 +33,10 @@ MySerial::MySerial(int COMnum, bool timeout_flag) {
 	}
 }
 
-void MySerial::sendData(unsigned char data) {
+void MySerial::sendData(char data) {
 	using namespace std;
 	char lpBuffer[sizeof(data)];
-	*(unsigned*)lpBuffer = data;
+	*(char*)lpBuffer = data;
 
 	dNoOfBytesWritten = 0;
 	dNoOfBytestoWrite = sizeof(lpBuffer);
