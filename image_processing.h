@@ -50,7 +50,7 @@ void saveRGBandDepthMovies(std::string movieName_rgb, std::string movieName_dept
 		static cv::VideoWriter depthWriter(movieName_depth, cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(kinect.depthWidth, kinect.depthHeight), false);
 
 		while (1) {
-			kinect.setDepthandMappedRGB();
+			kinect.setMappedDepthandRGB();
 			cv::Mat img;
 			cv::cvtColor(kinect.RGBImage, img, CV_BGRA2BGR);
 			depthWriter << kinect.depthImage;
@@ -76,8 +76,8 @@ void saveRGBandMappedDepthMovies(std::string movieName_rgb, std::string movieNam
 		kinect.initializeColor();
 		kinect.initializeDepth();
 		kinect.initializeMulti();
-		static cv::VideoWriter rgbWriter(movieName_rgb, cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(kinect.colorWidth, kinect.colorHeight), true);
-		static cv::VideoWriter depthWriter(movieName_depth, cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(kinect.colorWidth, kinect.colorHeight), false);
+		static cv::VideoWriter rgbWriter(movieName_rgb, cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(kinect.depthWidth, kinect.depthHeight), true);
+		static cv::VideoWriter depthWriter(movieName_depth, cv::VideoWriter::fourcc('X', 'V', 'I', 'D'), 30, cv::Size(kinect.depthWidth, kinect.depthHeight), false);
 
 		while (1) {
 			kinect.setMappedDepthandRGB();
@@ -86,10 +86,8 @@ void saveRGBandMappedDepthMovies(std::string movieName_rgb, std::string movieNam
 			depthWriter << kinect.depthImage;
 			rgbWriter << img;
 
-			cv::resize(kinect.depthImage, depth, cv::Size(), 0.4, 0.4);
-			cv::resize(kinect.RGBImage, rgb, cv::Size(), 0.4, 0.4);
-			cv::imshow("depthImage", depth);
-			cv::imshow("RGBImage", rgb);
+			cv::imshow("depthImage", kinect.depthImage);
+			cv::imshow("RGBImage", kinect.RGBImage);
 
 			auto key = cv::waitKey(1);
 			if (key == 'q') {

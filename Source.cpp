@@ -32,9 +32,9 @@ int main() {
 
 	//saveRGBandMappedDepthMovies(movieName_RGB,movieName_depth);
 	//test();
-	LSDtestByKinect(ringtype[0]);
-	//LSDtestByMovie(ringtype[0]);
-	//adjustValues("./faultMovies/RGByellow.avi", "./faultMovies/depthyellow.avi");
+	//LSDtestByKinect(ringtype[0]);
+	LSDtestByMovie(ringtype[0]);
+	//adjustValues("./shuttleMovies/rgb_success.avi", "./shuttleMovies/depth_success.avi");
 	return 0;
 }
 
@@ -72,8 +72,8 @@ void LSDtestByMovie(char ringtype) {
 	ringHSV.initHSVvalues("hsvValues_blue.xml");
 
 	while (1) {
-		if (!kinect.setRGBbyMovie("./shuttleMovies/rgb_test.avi")) break;
-		kinect.setDepthbyMovie("./shuttleMovies/depth_test.avi");
+		if (!kinect.setRGBbyMovie("./shuttleMovies/rgb_success.avi")) break;
+		kinect.setDepthbyMovie("./shuttleMovies/depth_success.avi");
 		cv::resize(kinect.RGBImage, kinect.RGBImage, cv::Size(512, 424));
 		cv::resize(kinect.depthImage, kinect.depthImage, cv::Size(512, 424));
 		cv::imshow("RGB", kinect.RGBImage);
@@ -99,7 +99,7 @@ void LSDtestByMovie(char ringtype) {
 
 		poledata.setpole_angle();
 		if (poledata.found_angle_flag) {
-			cout << (int)poledata.pole_angle << endl;
+			cout << "pole angle" << (int)poledata.pole_angle << endl;
 			serial.sendData(poledata.pole_angle);
 		}
 		auto key = cv::waitKey(1);
@@ -125,8 +125,8 @@ void LSDtestByKinect(char ringtype) {
 
 	while (1) {
 		kinect.setMappedDepthandRGB();
-		cv::resize(kinect.RGBImage, kinect.RGBImage, cv::Size(512, 424));
-		cv::resize(kinect.depthImage, kinect.depthImage, cv::Size(512, 424));
+		//cv::resize(kinect.RGBImage, kinect.RGBImage, cv::Size(512, 424));
+		//cv::resize(kinect.depthImage, kinect.depthImage, cv::Size(512, 424));
 		kinect.hsvKeeper.setHSVvalues();
 		kinect.hsvKeeper.setHSVImage(kinect.RGBImage);
 		kinect.hsvKeeper.extractColor();
@@ -135,7 +135,8 @@ void LSDtestByKinect(char ringtype) {
 		ringHSV.setHSVImage(kinect.RGBImage);
 		ringHSV.extractColor();
 		convedRing = convBinarizaionByHsv(kinect.depthImage, ringHSV.hsvImage); //ÂF•t‹ß‚¾‚¯’Šo‚µ‚½‚à‚Ì
-
+		cv::imshow("rgb", kinect.RGBImage);
+		cv::imshow("convedRing", convedRing);
 		setPoleDatabyLSD(convedImage, poledata, 0, 0.90);
 		setPoleDepth(poledata, kinect.depthImage, kinect.hsvKeeper.hsvImage);
 		showPoleLine(kinect.depthImage, poledata);
@@ -143,7 +144,7 @@ void LSDtestByKinect(char ringtype) {
 		find_shuttleLoc(poledata, convedRing);
 		poledata.setpole_angle();
 		if (poledata.found_angle_flag) {
-			cout << (int)poledata.pole_angle << endl;
+			cout << "pole angle" << (int)poledata.pole_angle << endl;
 			serial.sendData(poledata.pole_angle);
 		}
 		auto key = cv::waitKey(1);
@@ -177,6 +178,7 @@ void adjustValues(std::string movieName_RGB, std::string movieName_depth) {
 	MyKinectV2 kinect;
 	kinect.initializeDepth();
 	kinect.initializeColor();
+	kinect.initializeMulti();
 #pragma region initialize_trackbar
 	ValueManager<int> HSVManager(hsvfile_name);
 	HSVManager.set_value("min_h", &kinect.hsvKeeper.min_h, 180); HSVManager.set_value("min_s", &kinect.hsvKeeper.min_s, 255); HSVManager.set_value("min_v", &kinect.hsvKeeper.min_v, 255);
@@ -193,11 +195,9 @@ void adjustValues(std::string movieName_RGB, std::string movieName_depth) {
 			kinect.setRGBbyMovie(movieName_RGB);
 			break;
 		case 1:
-			kinect.setDepth();
-			kinect.setMappedRGB();
+			kinect.setMappedDepthandRGB();
 			break;
 		}
-		binarization(kinect.depthImage, kinect.MINDEPTH, kinect.MAXDEPTH);
 
 		cv::imshow("depthImage", kinect.depthImage);
 		cv::imshow("RGBImage", kinect.RGBImage);

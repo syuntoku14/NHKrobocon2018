@@ -244,6 +244,9 @@ void MyKinectV2::setMappedDepthandRGB() {
 	int depthIndex = (depthY*depthWidth) + depthX;
 	depthImage.data[i] = (UINT16)((depthBuffer[depthIndex]/8000.0)*250.0);
 	}
+
+	cv::resize(RGBImage, RGBImage, cv::Size(512, 424));
+	cv::resize(depthImage,depthImage, cv::Size(512, 424));
 }
 bool MyKinectV2::setRGBbyMovie(std::string movieName) {
 	static cv::VideoCapture cap(movieName);

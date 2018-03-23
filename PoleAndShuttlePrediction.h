@@ -37,6 +37,7 @@ public:
 	cv::Rect ringROI;
 	cv::Mat ringImage;
 	cv::Point shuttleXY;
+	bool success_flag=false;
 
 	void setpoledata(cv::Vec4f line) {
 		this->found_flag = true;
@@ -81,22 +82,6 @@ public:
 	}
 };
 
-void setPoleDepthbyKinect(PoleData &poledata, const std::vector<UINT16> &depthBuffer, const cv::Mat HSVImage) {
-	using namespace std;
-	auto x = (int)((poledata.poledata[0] + poledata.poledata[2]) / 2);
-	auto y = (int)((poledata.poledata[1] + poledata.poledata[3]) / 2);
-	auto cols = HSVImage.cols;
-	if (poledata.found_flag) {
-		for (int i = -5; i < 6; i++) {
-			auto coord = cols * y + max(0, x + i);
-			if (HSVImage.data[coord] > 200) {
-				poledata.poleDepth = depthBuffer[coord];
-				break;
-			}
-		}
-	}
-	std::cout << "poleDepth: " << poledata.poleDepth << endl;
-};
 
 void setPoleDepth(PoleData &poledata, const cv::Mat depthImage, const cv::Mat HSVImage) {
 	auto x = (int)((poledata.poledata[0] + poledata.poledata[2]) / 2);
@@ -109,41 +94,8 @@ void setPoleDepth(PoleData &poledata, const cv::Mat depthImage, const cv::Mat HS
 		}
 		depth.size() != 0 ? poledata.poleDepth = std::accumulate(depth.begin(), depth.end(), 0.0) / depth.size() : poledata.poleDepth = -1;
 	}
-	std::cout << "poleDepth: " << poledata.poleDepth << std::endl;
+	//std::cout << "poleDepth: " << poledata.poleDepth << std::endl;
 };
-
-//void setPoleDatabyHoughLine(cv::Mat& src, PoleData &poledata, HoughLineParamaters params) {
-//	using namespace std;
-//	using namespace cv;
-//
-//	Mat dst;
-//	vector<Vec4i> lines;
-//	Canny(src, dst, 50, 200, 3);
-//	HoughLinesP(dst, lines, params.rho, params.theta, params.threshold, params.minLineLength, params.maxLineGap);
-//
-//	auto v = [](PoleData m1, PoleData m2) {return m1.length < m2.length; };
-//	priority_queue<PoleData, std::vector<PoleData>, decltype(v)> poles(v);
-//
-//	//ˆê’èˆÈã‚ÌŠp“x‚Ì‚à‚Ì‚ğ’Šo
-//	for (size_t i = 0; i < lines.size(); i++) {
-//		double angle = atan(abs(lines[i][1] - lines[i][3]) / (abs(lines[i][0] - lines[i][2]) + 1e-10));
-//		if (lines[i][0] < 507 && lines[i][0]>5) { //’[‚Á‚±‚ÅƒoƒO‚é
-//			if (angle > CV_PI / 2.0*params.angleThreshold) {
-//				float length = sqrt(pow((lines[i][0] - lines[i][2]), 2) + pow((lines[i][1] - lines[i][3]), 2));
-//				poles.push(PoleData(length, lines[i]));
-//			}
-//		}
-//	}
-//
-//	if (!poles.empty()) {
-//		//’·‚³‚ªÅ‘å‚Ìline‚ğpoledata‚ÉŠi”[
-//		poledata = poles.top();
-//		//’¸“_î•ñ‚ğŠi”[
-//		if (poledata.poledata[1] >= poledata.poledata[3]) { poledata.topPosition[0] = poledata.poledata[2]; poledata.topPosition[1] += poledata.poledata[3]; }
-//		else { poledata.topPosition[0] = poledata.poledata[0]; poledata.topPosition[1] += poledata.poledata[1]; }
-//	}
-//
-//};
 
 bool comp(cv::Vec4f& left, cv::Vec4f& right) {
 	return left[1] == right[1] ? left[3] > right[3] : left[1] > right[1];
@@ -302,6 +254,7 @@ void showPoleLine_when_Kinect(cv::Mat &img, PoleData poledata) {
 	//}
 
 void find_shuttleLoc(PoleData& poledata, cv::Mat& img) {
+	using namespace std;
 	cv::Mat color_ring;
 
 	float ringRad, trueLength;
@@ -309,7 +262,7 @@ void find_shuttleLoc(PoleData& poledata, cv::Mat& img) {
 	const int KERNELSIZE = 3;
 	const int FILTERTH = 150;
 	static cv::Mat kernel = cv::Mat::ones(KERNELSIZE, KERNELSIZE, CV_64F) / (double)(KERNELSIZE*KERNELSIZE);
-
+	cv::Scalar sum_of_ring;
 	if (poledata.found_flag) {
 		int sideLength = (int)(poledata.length*ringRad / trueLength) + 4;
 		int x = std::max(poledata.topPosition[0] - sideLength - 2, 0);
@@ -319,6 +272,13 @@ void find_shuttleLoc(PoleData& poledata, cv::Mat& img) {
 		cv::imshow("ringImage", poledata.ringImage);
 		cv::filter2D(poledata.ringImage, poledata.ringImage, -1, kernel);
 		cv::threshold(poledata.ringImage, poledata.ringImage, FILTERTH, 0, cv::THRESH_TOZERO);
+		sum_of_ring = cv::sum(poledata.ringImage);
+		if (sum_of_ring[0] > 20) { 
+			cout << "sum of ring" << sum_of_ring[0] << endl;
+			cv::minMaxLoc(poledata.ringImage, NULL, NULL, NULL, &poledata.shuttleXY);
+			cout << "shutlleXY: " << poledata.shuttleXY << endl;
+			poledata.success_flag = true;
+		}
 		cv::imshow("ringImage_filtered", poledata.ringImage);
 	}
 }
