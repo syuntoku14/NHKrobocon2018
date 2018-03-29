@@ -14,7 +14,7 @@ private:
 	int Status;
 
 public:
-	MySerial(int COMnum, bool timeout_flag);
+	MySerial(int COMnum);
 
 	void sendData(char data);
 	void sendData(int data);
