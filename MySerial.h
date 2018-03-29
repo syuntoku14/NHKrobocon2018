@@ -16,11 +16,12 @@ private:
 public:
 	MySerial(int COMnum);
 
-	void sendData(unsigned char data);
+	void sendData(char data);
 	void sendData(int data);
 	void recieveData(char SerialBuffer[]);
-
-	~MySerial();
+	~MySerial() {
+		CloseHandle(hComm);
+	}
 };
 
 #endif
