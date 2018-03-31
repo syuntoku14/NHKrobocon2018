@@ -46,7 +46,7 @@ void MySerial::sendData(char data) {
 		dNoOfBytestoWrite,
 		&dNoOfBytesWritten,
 		NULL);
-	cout << dNoOfBytesWritten << endl;
+	//cout << dNoOfBytesWritten << endl;
 }
 void MySerial::sendData(int data) {
 	using namespace std;
@@ -61,7 +61,7 @@ void MySerial::sendData(int data) {
 		dNoOfBytestoWrite,
 		&dNoOfBytesWritten,
 		NULL);
-	cout << dNoOfBytesWritten << endl;
+	//cout << dNoOfBytesWritten << endl;
 }
 void MySerial::recieveData(char SerialBuffer[]) {
 	//GetCommTimeouts(hComm, &timeouts);
@@ -93,4 +93,3 @@ void MySerial::recieveData(char SerialBuffer[]) {
 	} while (NoBytesRead > 0);
 
 }
-
