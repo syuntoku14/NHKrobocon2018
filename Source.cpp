@@ -35,6 +35,7 @@ MySerial serial(3);
 
 char msg;
 char first_buff[8];
+
 void  rcv_char(char &c) {
 	using namespace std;
 	while (1) {
@@ -45,11 +46,28 @@ void  rcv_char(char &c) {
 		cout << c << endl;
 		//cout << "recieved data: " << buffer << endl;
 	}
+	return;
+}
+
+class Send_Data {
+public:
+	char data;
+	bool send_flag;
+	Send_Data(bool send_flag) {
+		this->send_flag = send_flag;
+	}
+};
+
+void send_char(Send_Data& send_data) {
+	if (send_data.send_flag) serial.sendData(send_data.data);
+	return;
 }
 
 int main() {
 	using namespace std;
 
+	loop:
+	Sleep(1000);
 	serial.recieveData(first_buff);
 	msg = first_buff[0];
 	cout << msg << endl;
@@ -63,8 +81,11 @@ int main() {
 		LSDtestByKinect(msg);
 		//LSDtestByMovie(msg);
 		//adjustValues("./shuttleMovies/rgb_success.avi", "./shuttleMovies/depth_success.avi");
-		return 0;
 	}
+
+	serial.~MySerial();
+	//goto loop;
+	return 0;
 }
 
 void LSDtestByMovie(char &ringtype) {
@@ -138,6 +159,11 @@ void LSDtestByKinect(char &ringtype) {
 	HSVkeeper ringHSV;
 	ringHSV.initHSVvalues("hsvValues_blue.xml");
 
+	Send_Data send_poledata(false);
+	Send_Data send_successdata(false);
+	std::thread send_poledata_thrd(send_char, ref(send_poledata));
+	std::thread send_success_thrd(send_char, ref(send_successdata));
+
 	while (1) {
 		kinect.setMappedDepthandRGB();
 		kinect.hsvKeeper.setHSVvalues();
@@ -158,17 +184,21 @@ void LSDtestByKinect(char &ringtype) {
 		if (poledata.found_angle_flag) {
 			if (msg != 'q') {
 				cout << "pole angle" << (int)poledata.pole_angle << endl;
+				send_poledata.send_flag = true;
 				//serial.sendData(poledata.pole_angle);
 			}
 		}
 		if (msg == 'q') {
+			send_poledata.send_flag = false;
 			find_shuttleLoc(poledata, convedRing);
+			send_successdata.send_flag = true;
 			//serial.sendData(poledata.success_flag);
 		}
 		auto key = cv::waitKey(1);
 		if (key == 'q' || msg == 'e') break;
 		else if (key == 's') cv::waitKey(0);
 	}
+	return;
 }
 
 void adjustValues(std::string movieName_RGB, std::string movieName_depth) {

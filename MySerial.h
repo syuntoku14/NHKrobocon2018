@@ -4,7 +4,7 @@
 #include<string>
 #include<iostream>
 
-class MySerial{
+class MySerial {
 private:
 	HANDLE hComm;
 	DCB dcbSerialParams;
@@ -20,8 +20,8 @@ public:
 	void sendData(int data);
 	void recieveData(char SerialBuffer[]);
 	~MySerial() {
-		CloseHandle(hComm);
-	}
+		CloseHandle(this->hComm);
+	};
 };
 
 #endif

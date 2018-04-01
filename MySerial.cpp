@@ -64,7 +64,7 @@ void MySerial::sendData(int data) {
 	//cout << dNoOfBytesWritten << endl;
 }
 void MySerial::recieveData(char SerialBuffer[]) {
-	//GetCommTimeouts(hComm, &timeouts);
+	//GetCommTimeouts(hComm, &timeouts)
 
 	//setting WaiComm Event
 	Status = SetCommMask(hComm, EV_RXCHAR); //Configure Windows to Monitor the serial device for Character Reception
