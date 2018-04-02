@@ -31,59 +31,18 @@ void adjustValues(std::string movieName_rgb, std::string movieName_depth);
 
 //基本的に取れていないデータには-1が入る
 
-MySerial serial(3);
 
-char msg;
-char first_buff[8];
-
-void  rcv_char(char &c) {
+int main(int argc, char* argv[]) {
 	using namespace std;
-	while (1) {
-		char buffer[8];
-		serial.recieveData(buffer);
-		//cout << buffer << endl;
-		c = buffer[0];
-		cout << c << endl;
-		//cout << "recieved data: " << buffer << endl;
-	}
-	return;
-}
+	char msg = *argv[1];
 
-class Send_Data {
-public:
-	char data;
-	bool send_flag;
-	Send_Data(bool send_flag) {
-		this->send_flag = send_flag;
-	}
-};
-
-void send_char(Send_Data& send_data) {
-	if (send_data.send_flag) serial.sendData(send_data.data);
-	return;
-}
-
-int main() {
-	using namespace std;
-
-	loop:
-	Sleep(1000);
-	serial.recieveData(first_buff);
-	msg = first_buff[0];
-	cout << msg << endl;
-	//serial通信でmsgを受け取ったら行動開始
 	if (msg == 'r' || msg == 'g') {
-		serial.sendData(msg);
-		Sleep(1000); //受け取ったら1秒待つ
-		std::thread thrd(rcv_char, std::ref(msg));
-		thrd.detach();
 		//saveRGBandMappedDepthMovies(movieName_RGB,movieName_depth);
-		LSDtestByKinect(msg);
-		//LSDtestByMovie(msg);
+		//LSDtestByKinect(msg);
+		LSDtestByMovie(msg);
 		//adjustValues("./shuttleMovies/rgb_success.avi", "./shuttleMovies/depth_success.avi");
 	}
 
-	serial.~MySerial();
 	//goto loop;
 	return 0;
 }
@@ -127,19 +86,16 @@ void LSDtestByMovie(char &ringtype) {
 
 		poledata.setpole_angle();
 		if (poledata.found_angle_flag) {
-			if (msg != 'q') {
-				cout << "pole angle" << (int)poledata.pole_angle << endl;
-				serial.sendData(poledata.pole_angle);
-			}
+			cout << "pole angle" << (int)poledata.pole_angle << endl;
 		}
 
-		if (msg == 'q') {
-			find_shuttleLoc(poledata, convedRing);
-			cout << poledata.success_flag << endl;
-		}
+		//if (msg == 'q') {
+		//	find_shuttleLoc(poledata, convedRing);
+		//	cout << poledata.success_flag << endl;
+		//}
 
 		auto key = cv::waitKey(1);
-		if (key == 'q' || msg == 'e') break;
+		if (key == 'q') break;
 		else if (key == 's') cv::waitKey(0);
 	}
 }
@@ -159,11 +115,6 @@ void LSDtestByKinect(char &ringtype) {
 	HSVkeeper ringHSV;
 	ringHSV.initHSVvalues("hsvValues_blue.xml");
 
-	Send_Data send_poledata(false);
-	Send_Data send_successdata(false);
-	std::thread send_poledata_thrd(send_char, ref(send_poledata));
-	std::thread send_success_thrd(send_char, ref(send_successdata));
-
 	while (1) {
 		kinect.setMappedDepthandRGB();
 		kinect.hsvKeeper.setHSVvalues();
@@ -182,20 +133,16 @@ void LSDtestByKinect(char &ringtype) {
 
 		poledata.setpole_angle();
 		if (poledata.found_angle_flag) {
-			if (msg != 'q') {
-				cout << "pole angle" << (int)poledata.pole_angle << endl;
-				send_poledata.send_flag = true;
-				//serial.sendData(poledata.pole_angle);
-			}
+			cout << "pole angle" << (int)poledata.pole_angle << endl;
 		}
-		if (msg == 'q') {
-			send_poledata.send_flag = false;
-			find_shuttleLoc(poledata, convedRing);
-			send_successdata.send_flag = true;
-			//serial.sendData(poledata.success_flag);
-		}
+		//if (msg == 'q') {
+		//	send_poledata.send_flag = false;
+		//	find_shuttleLoc(poledata, convedRing);
+		//	send_successdata.send_flag = true;
+		//	//serial.sendData(poledata.success_flag);
+		//}
 		auto key = cv::waitKey(1);
-		if (key == 'q' || msg == 'e') break;
+		if (key == 'q') break;
 		else if (key == 's') cv::waitKey(0);
 	}
 	return;

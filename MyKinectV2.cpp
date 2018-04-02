@@ -105,7 +105,7 @@ void MyKinectV2::initializeColor() {
 	ERROR_CHECK(defaultColorFrameDescription->get_Width(&colorWidth));
 	ERROR_CHECK(defaultColorFrameDescription->get_Height(&colorHeight));
 	ERROR_CHECK(defaultColorFrameDescription->get_BytesPerPixel(&colorBytesPerPixel));
-	std::cout << "colorWidth : " << colorWidth << std::endl << "colorHeight: " << colorHeight << std::endl << "colorBytesPerPixel: " << colorBytesPerPixel << std::endl;
+	//std::cout << "colorWidth : " << colorWidth << std::endl << "colorHeight: " << colorHeight << std::endl << "colorBytesPerPixel: " << colorBytesPerPixel << std::endl;
 
 	// カラー画像のサイズを取得する
 	CComPtr<IFrameDescription> colorFrameDescription;
@@ -114,7 +114,7 @@ void MyKinectV2::initializeColor() {
 	ERROR_CHECK(colorFrameDescription->get_Width(&colorWidth));
 	ERROR_CHECK(colorFrameDescription->get_Height(&colorHeight));
 	ERROR_CHECK(colorFrameDescription->get_BytesPerPixel(&colorBytesPerPixel));
-	std::cout << "create  : " << colorWidth << ", " << colorHeight << ", " << colorBytesPerPixel << std::endl;
+	//std::cout << "create  : " << colorWidth << ", " << colorHeight << ", " << colorBytesPerPixel << std::endl;
 
 	// バッファーを作成する
 	colorBuffer.resize(colorWidth * colorHeight * colorBytesPerPixel);
@@ -280,10 +280,10 @@ void MyKinectV2::initializeDepth() {
 		&minDepthReliableDistance));
 	ERROR_CHECK(depthFrameSource->get_DepthMaxReliableDistance(
 		&maxDepthReliableDistance));
-	std::cout << "Depth最小値       : " << minDepthReliableDistance << std::endl;
-	std::cout << "Depth最大値       : " << maxDepthReliableDistance << std::endl;
-	std::cout << "depthWidth: " << depthWidth << std::endl;
-	std::cout << "depthHeight: " << depthHeight << std::endl;
+	//std::cout << "Depth最小値       : " << minDepthReliableDistance << std::endl;
+	//std::cout << "Depth最大値       : " << maxDepthReliableDistance << std::endl;
+	//std::cout << "depthWidth: " << depthWidth << std::endl;
+	//std::cout << "depthHeight: " << depthHeight << std::endl;
 
 	// バッファーを作成する
 	depthBuffer.resize(depthWidth * depthHeight);
