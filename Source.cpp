@@ -7,6 +7,7 @@
 #include"MySerial.h"
 #include<thread>
 #include<string>
+#include<mutex>
 
 //シリアル通信のせいで処理が遅れている。ループ内に入れると処理がおそくなる。
 
@@ -31,6 +32,17 @@ void adjustValues(std::string movieName_rgb, std::string movieName_depth);
 
 //基本的に取れていないデータには-1が入る
 
+std::mutex mtx;
+char msg = 'x'; //標準入力のメッセージ
+
+void cin_thread(char& msg) {
+	using namespace std;
+	while (true) {
+		std::lock_guard<std::mutex> lock(mtx);
+		cin >> msg;
+		if (msg == 'e') break;
+	}
+}
 
 int main(int argc, char* argv[]) {
 	using namespace std;
@@ -38,8 +50,8 @@ int main(int argc, char* argv[]) {
 
 	if (msg == 'r' || msg == 'g') {
 		//saveRGBandMappedDepthMovies(movieName_RGB,movieName_depth);
-		//LSDtestByKinect(msg);
-		LSDtestByMovie(msg);
+		LSDtestByKinect(msg);
+		//LSDtestByMovie(msg);
 		//adjustValues("./shuttleMovies/rgb_success.avi", "./shuttleMovies/depth_success.avi");
 	}
 
@@ -90,8 +102,8 @@ void LSDtestByMovie(char &ringtype) {
 		}
 
 		//if (msg == 'q') {
-		//	find_shuttleLoc(poledata, convedRing);
-		//	cout << poledata.success_flag << endl;
+		find_shuttleLoc(poledata, convedRing);
+		cout <<"success_flag "<< poledata.success_flag << endl;
 		//}
 
 		auto key = cv::waitKey(1);
@@ -125,7 +137,7 @@ void LSDtestByKinect(char &ringtype) {
 		ringHSV.setHSVImage(kinect.RGBImage);
 		ringHSV.extractColor();
 		convedRing = convBinarizaionByHsv(kinect.depthImage, ringHSV.hsvImage); //青色付近だけ抽出したもの
-		cv::imshow("rgb", kinect.RGBImage);
+		//cv::imshow("rgb", kinect.RGBImage);
 		//cv::imshow("convedRing", convedRing);
 		setPoleDatabyLSD(convedImage, poledata, 0, 0.90);
 		setPoleDepth(poledata, kinect.depthImage, kinect.hsvKeeper.hsvImage);
@@ -137,7 +149,9 @@ void LSDtestByKinect(char &ringtype) {
 		}
 		//if (msg == 'q') {
 		//	send_poledata.send_flag = false;
-		//	find_shuttleLoc(poledata, convedRing);
+
+		find_shuttleLoc(poledata, convedRing);
+		cout << "success flag " << poledata.success_flag << endl;
 		//	send_successdata.send_flag = true;
 		//	//serial.sendData(poledata.success_flag);
 		//}

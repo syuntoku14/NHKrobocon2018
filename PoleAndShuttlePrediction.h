@@ -269,10 +269,11 @@ void find_shuttleLoc(PoleData& poledata, cv::Mat& img) {
 		int y = std::max(poledata.topPosition[1] - sideLength * 2 - 2, 0);
 		poledata.ringROI = cv::Rect(x, y, sideLength * 2, sideLength * 2);
 		poledata.ringImage = img(poledata.ringROI);
-		cv::imshow("ringImage", poledata.ringImage);
+		//cv::imshow("ringImage", poledata.ringImage);
 		cv::filter2D(poledata.ringImage, poledata.ringImage, -1, kernel);
 		cv::threshold(poledata.ringImage, poledata.ringImage, FILTERTH, 0, cv::THRESH_TOZERO);
 		sum_of_ring = cv::sum(poledata.ringImage);
+		poledata.success_flag = false;
 		if (sum_of_ring[0] > 20) { 
 			cout << "sum of ring" << sum_of_ring[0] << endl;
 			cv::minMaxLoc(poledata.ringImage, NULL, NULL, NULL, &poledata.shuttleXY);
