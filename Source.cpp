@@ -46,13 +46,14 @@ void cin_thread(char& msg) {
 
 int main(int argc, char* argv[]) {
 	using namespace std;
-	char msg = *argv[1];
+	char msg = *argv[2];
+	char mode = *argv[1]; //kでkinectモード mでmovieモード aでHSV調整モード
 
 	if (msg == 'r' || msg == 'g') {
 		//saveRGBandMappedDepthMovies(movieName_RGB,movieName_depth);
-		LSDtestByKinect(msg);
-		//LSDtestByMovie(msg);
-		//adjustValues("./shuttleMovies/rgb_success.avi", "./shuttleMovies/depth_success.avi");
+		if(mode=='k') LSDtestByKinect(msg);
+		else if (mode=='m') LSDtestByMovie(msg);
+		else if (mode=='a') adjustValues("./shuttleMovies/rgb_success.avi", "./shuttleMovies/depth_success.avi");
 	}
 
 	//goto loop;
@@ -103,7 +104,7 @@ void LSDtestByMovie(char &ringtype) {
 
 		//if (msg == 'q') {
 		find_shuttleLoc(poledata, convedRing);
-		cout <<"success_flag "<< poledata.success_flag << endl;
+		cout <<"success_flag"<< poledata.success_flag << endl;
 		//}
 
 		auto key = cv::waitKey(1);
@@ -151,7 +152,7 @@ void LSDtestByKinect(char &ringtype) {
 		//	send_poledata.send_flag = false;
 
 		find_shuttleLoc(poledata, convedRing);
-		cout << "success flag " << poledata.success_flag << endl;
+		cout << "success flag" << poledata.success_flag << endl;
 		//	send_successdata.send_flag = true;
 		//	//serial.sendData(poledata.success_flag);
 		//}
@@ -167,7 +168,7 @@ void adjustValues(std::string movieName_RGB, std::string movieName_depth) {
 	std::cout << "0: movie mode\n1: camera mode" << std::endl;
 	int flag;
 	std::cin >> flag;
-	std::cout << "chose color to save\nr: red b: blue y: yellow" << std::endl;
+	std::cout << "chose color to save\nr: red b: blue(for shuttlecock) y: yellow g: golden(for shuttlecock)" << std::endl;
 	char color_flag;
 	std::cin >> color_flag;
 	std::string hsvfile_name;
@@ -181,6 +182,8 @@ void adjustValues(std::string movieName_RGB, std::string movieName_depth) {
 	case 'y':
 		hsvfile_name = "hsvValues_yellow.xml";
 		break;
+	case 'g':
+		hsvfile_name = "hsvValues_golden.xml";
 	}
 	std::cout << "o: save values \nq: quit\ns: stop" << std::endl;
 
@@ -208,7 +211,7 @@ void adjustValues(std::string movieName_RGB, std::string movieName_depth) {
 			break;
 		}
 
-		cv::imshow("depthImage", kinect.depthImage);
+		//cv::imshow("depthImage", kinect.depthImage);
 		cv::imshow("RGBImage", kinect.RGBImage);
 
 		kinect.hsvKeeper.setHSVvalues();

@@ -3,49 +3,28 @@ import subprocess
 import time
 import serial
 import threading
-from NHK_utils import multi_process
-
-class Serial_data(object):
-    def __init__(self):
-        self.rcv_msg=0
-        self.flag=False
-
-#read char from serial port
-class Serial_thread(threading.Thread):
-    def __init__(self,ser,msg):
-        super().__init__()
-        self.ser=ser
-        self.msg=msg
-    
-    def run(self):
-        connected=False
-        while not connected:
-            connected=True
-            while True:
-                if self.msg.flag: break
-                self.msg.rcv_msg=self.ser.read().decode()
+import os
+import re
+from NHK_utils.multi_process import get_lines, Serial_data, Serial_thread, NHK_read_and_send
 
 def main():
-    COMPORT=2
-    pole_cmd='NHKrobocon2018.exe r'
     #open serial port
-    try:
-        ser.close()
-        ser=serial.Serial(port=COMPORT,baudrate=9600,timeout=None)
-    except:
-        ser=serial.Serial(port=COMPORT,baudrate=9600,timeout=None)
-    
-    msg=Serial_data()
-    msg.rcv_msg='x'
-    #thread of serial port
-    thread=Serial_thread(ser,msg)
-    thread.start()
+    COMPORT=2
+    ser=serial.Serial(port=COMPORT,baudrate=9600,timeout=None)
+    data=Serial_data()
+    data.rcv_msg='x'
+    data.serial_kill=False
 
-    #get output of NHKrobocon
-    for poleangle in  multi_process.get_lines(cmd=pole_cmd):
-        print(poleangle)
-        print(msg.rcv_msg)
-    msg.flag=True
+    #start thread for serial port
+    thread=Serial_thread(ser,data)
+    thread.start()
+    
+    while data.rcv_msg!='t':
+        #get output of NHKrobocon
+        print(data.rcv_msg)
+        NHK_read_and_send(ser,data)
+        time.sleep(0.01)
+    data.serial_kill=True
 
 if __name__=='__main__':
     main()
