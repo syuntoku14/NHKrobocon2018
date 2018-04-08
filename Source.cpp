@@ -95,7 +95,7 @@ void LSDtestByMovie(char &ringtype) {
 		ringHSV.setHSVvalues();
 		ringHSV.setHSVImage(kinect.RGBImage);
 		ringHSV.extractColor();
-		convedRing = convBinarizaionByHsv(kinect.depthImage, ringHSV.hsvImage); //青色付近だけ抽出したもの
+		convedRing = convBinarizaionByHsv(ringHSV.hsvImage, kinect.depthImage); //青色付近だけ抽出したもの
 
 		poledata.setpole_angle();
 		if (poledata.found_angle_flag) {
@@ -137,9 +137,10 @@ void LSDtestByKinect(char &ringtype) {
 		ringHSV.setHSVvalues();
 		ringHSV.setHSVImage(kinect.RGBImage);
 		ringHSV.extractColor();
-		convedRing = convBinarizaionByHsv(kinect.depthImage, ringHSV.hsvImage); //青色付近だけ抽出したもの
+		convedRing = convBinarizaionByHsv(ringHSV.hsvImage, kinect.depthImage); //青色付近だけ抽出したもの
 		//cv::imshow("rgb", kinect.RGBImage);
 		//cv::imshow("convedRing", convedRing);
+		//cv::imshow("ringhsv",ringHSV.hsvImage);
 		setPoleDatabyLSD(convedImage, poledata, 0, 0.90);
 		setPoleDepth(poledata, kinect.depthImage, kinect.hsvKeeper.hsvImage);
 		showPoleLine(kinect.depthImage, poledata);

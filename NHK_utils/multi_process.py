@@ -14,7 +14,8 @@ class Serial_data(object):
         self.rcv_msg=0
         self.serial_kill=False
         self.pole_angle=None
-        self.success_flag=False
+        self.success_msg=None
+        self.success_flag='0'
 
 #read char from serial port
 class Serial_thread(threading.Thread):
@@ -54,27 +55,31 @@ def message_to_pole_success(message):
     '''
     pole_match=re.match('pole angle',message)
     success_match=re.match('success flag',message)
-    angle=str(message[pole_match.end():]) if pole_match!=None else None
-    scs=str(message[success_match.end():]) if success_match!=None else None
+    angle=str(message[pole_match.end():pole_match.end()+2]) if pole_match!=None else None
+    scs=str(message[success_match.end():success_match.end()+1]) if success_match!=None else None
     return angle, scs
 
 #print what recieved from port and send pole_angle and success_flag
 def NHK_read_and_send(ser,data):
     print(data.rcv_msg)
+    data.success_flag='0\n'
     if data.rcv_msg=='r' or data.rcv_msg=='g':
         pole_cmd='NHKrobocon2018.exe k r' if data.rcv_msg=='r' else 'NHKrobocon2018.exe k g'
 
         proc=subprocess.Popen(pole_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) #NHK process
         for message in get_lines(proc=proc): #read from stdout
-            data.pole_angle,data.success_flag=message_to_pole_success(message)
+            #print(message)
+            data.pole_angle,data.success_msg=message_to_pole_success(message)
             #send pole_angle when rcv_msg is r or g
             if data.rcv_msg=='r' or data.rcv_msg=='g': 
                 if  data.pole_angle!=None: 
+                    data.pole_angle+='\n'
                     print('pole angle is:'+data.pole_angle)
                     ser.write(data.pole_angle.encode('utf-8'))
             #send success_flag when rcv_msg is q
             elif data.rcv_msg=='q':    
-                if  data.success_flag!=None:
+                if  data.success_msg!=None:
+                    if data.success_msg=='1': data.success_flag='1\n'
                     print('success flag is:'+data.success_flag)
                     ser.write(data.success_flag.encode('utf-8'))
             elif data.rcv_msg=='e': break

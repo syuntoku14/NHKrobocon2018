@@ -264,9 +264,9 @@ void find_shuttleLoc(PoleData& poledata, cv::Mat& img) {
 	static cv::Mat kernel = cv::Mat::ones(KERNELSIZE, KERNELSIZE, CV_64F) / (double)(KERNELSIZE*KERNELSIZE);
 	cv::Scalar sum_of_ring;
 	if (poledata.found_flag) {
-		int sideLength = (int)(poledata.length*ringRad / trueLength) + 4;
-		int x = std::max(poledata.topPosition[0] - sideLength - 2, 0);
-		int y = std::max(poledata.topPosition[1] - sideLength * 2 - 2, 0);
+		int sideLength = (int)(poledata.length*ringRad / trueLength) + 10;
+		int x = std::max(poledata.topPosition[0] - sideLength, 0);
+		int y = std::max(poledata.topPosition[1] - sideLength * 2, 0);
 		poledata.ringROI = cv::Rect(x, y, sideLength * 2, sideLength * 2);
 		poledata.ringImage = img(poledata.ringROI);
 		//cv::imshow("ringImage", poledata.ringImage);
@@ -274,8 +274,8 @@ void find_shuttleLoc(PoleData& poledata, cv::Mat& img) {
 		cv::threshold(poledata.ringImage, poledata.ringImage, FILTERTH, 0, cv::THRESH_TOZERO);
 		sum_of_ring = cv::sum(poledata.ringImage);
 		poledata.success_flag = false;
-		if (sum_of_ring[0] > 20) { 
-			cout << "sum of ring" << sum_of_ring[0] << endl;
+		//cout << "sum of ring" << sum_of_ring[0] << endl;
+		if (sum_of_ring[0] > 100) { 
 			cv::minMaxLoc(poledata.ringImage, NULL, NULL, NULL, &poledata.shuttleXY);
 			cout << "shutlleXY: " << poledata.shuttleXY << endl;
 			poledata.success_flag = true;
