@@ -142,7 +142,7 @@ void LSDtestByKinect(char &ringtype) {
 		//cv::imshow("convedRing", convedRing);
 		//cv::imshow("ringhsv",ringHSV.hsvImage);
 		setPoleDatabyLSD(convedImage, poledata, 0, 0.90);
-		setPoleDepth(poledata, kinect.depthImage, kinect.hsvKeeper.hsvImage);
+		//setPoleDepth(poledata, kinect.depthImage, kinect.hsvKeeper.hsvImage);
 		showPoleLine(kinect.depthImage, poledata);
 
 		poledata.setpole_angle();

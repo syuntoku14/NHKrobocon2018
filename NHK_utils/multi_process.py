@@ -63,12 +63,12 @@ def message_to_pole_success(message):
 def NHK_read_and_send(ser,data):
     print(data.rcv_msg)
     data.success_flag='0\n'
-    if data.rcv_msg=='r' or data.rcv_msg=='g':
-        pole_cmd='NHKrobocon2018.exe k r' if data.rcv_msg=='r' else 'NHKrobocon2018.exe k g'
+    if data.rcv_msg=='r' or data.rcv_msg=='q' or data.rcv_msg=='g':
+        pole_cmd='NHKrobocon2018.exe k r' if data.rcv_msg=='r' or data.rcv_msg=='q'  else 'NHKrobocon2018.exe k g'
 
         proc=subprocess.Popen(pole_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT) #NHK process
         for message in get_lines(proc=proc): #read from stdout
-            #print(message)
+            print(message)
             data.pole_angle,data.success_msg=message_to_pole_success(message)
             #send pole_angle when rcv_msg is r or g
             if data.rcv_msg=='r' or data.rcv_msg=='g': 
