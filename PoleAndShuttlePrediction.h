@@ -264,9 +264,10 @@ void find_shuttleLoc(PoleData& poledata, cv::Mat& img) {
 	static cv::Mat kernel = cv::Mat::ones(KERNELSIZE, KERNELSIZE, CV_64F) / (double)(KERNELSIZE*KERNELSIZE);
 	cv::Scalar sum_of_ring;
 	if (poledata.found_flag) {
-		int sideLength = max((int)(poledata.length*ringRad / trueLength)-10,0);
-		int x = std::max(poledata.topPosition[0] - sideLength, 0);
-		int y = std::max(poledata.topPosition[1] - sideLength * 2, 0);
+		int bias = 4;
+		int sideLength = max((int)(poledata.length*ringRad / trueLength)-2*bias,0);
+		int x = std::max(poledata.topPosition[0] - sideLength + bias, 0);
+		int y = std::max(poledata.topPosition[1] - sideLength * 2 + bias , 0);
 		poledata.ringROI = cv::Rect(x, y, sideLength * 2, sideLength * 2);
 		poledata.ringImage = img(poledata.ringROI);
 		//cv::imshow("ringImage", poledata.ringImage);

@@ -133,6 +133,7 @@ void LSDtestByKinect(char &ringtype) {
 		kinect.hsvKeeper.setHSVvalues();
 		kinect.hsvKeeper.setHSVImage(kinect.RGBImage);
 		kinect.hsvKeeper.extractColor();
+		binarization(kinect.depthImage, 5000, 8000); //5000mm から 8000mm のみ抽出
 		convedImage = convBinarizaionByHsv(kinect.hsvKeeper.hsvImage, kinect.depthImage); //赤色付近だけ抽出したもの
 		ringHSV.setHSVvalues();
 		ringHSV.setHSVImage(kinect.RGBImage);
